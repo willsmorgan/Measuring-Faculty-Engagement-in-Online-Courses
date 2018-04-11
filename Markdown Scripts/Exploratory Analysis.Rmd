@@ -1,7 +1,7 @@
 ---
 title: "Faculty Engagement EDA"
 author: "William Morgan"
-date: "February 26, 2018"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: pdf_document
 ---
 
@@ -310,7 +310,6 @@ keep it for later
 
 ```{r}
 summary(forum$num_fac_ta_posts)
-
 summary(forum$total_len_fac_ta_posts)
 ```
 
@@ -372,11 +371,6 @@ I'm actually just going to drop all the C session courses cause they represent
 like none of the sample
 
 ```{r new variables}
-# Variables I don't want to keep for modeling
-drop_vars <- c("myasu_course", "sync_st_dt", "sync_end_dt",
-               "acad_group", "acad_career", "acad_org", "campus",
-               "location", "subject", "catalog_nbr")
-
 # Grab question names
 questions <-  forum %>%
   select(starts_with('q_')) %>%
@@ -390,7 +384,7 @@ forum <- forum %>%
 forum_cleaned <- forum %>%
   mutate(prop_stu_posted = num_stu_with_posts / enrl_total,
          avg_gpa = sum_gpa / enrl_total,
-         prop_withdrw = wdwn_ct / enrl_total,
+         wdrw_rate = wdwn_ct / enrl_total,
          instr_score = (q_responded + q_present + q_feedback) / 3,
          design_score = (q_success + q_prepared + q_presentations + q_navigate) / 4,
          posts_per_student = num_stu_posts / enrl_total,
@@ -404,14 +398,15 @@ forum_cleaned <- forum %>%
          pass_rate = pass_ct / enrl_total,
          response_rate = num_evals_taken / num_evals_expected) %>%
   rename(course_id = myasu_course) %>%
-  select(course_id, strm, session_code, enrl_total, response_rate, has_hallway,
-         fac_posts_boc, fac_posts_eoc, total_len_fac_ta_posts, prop_stu_posted,
-         avg_gpa, prop_withdrw, instr_score, design_score, posts_per_fac,
-         posts_per_student, avg_fac_post_len, upper_division, pass_rate) %>%
+  select(course_id, session_code, pass_rate, avg_gpa, wdrw_rate,
+         enrl_total, response_rate, has_hallway,
+         fac_posts_boc, fac_posts_eoc, total_len_fac_ta_posts,
+         instr_score, design_score, posts_per_fac,
+         posts_per_student, avg_fac_post_len, upper_division) %>%
   filter(session_code %in% c("A", "B"))
 
 # Do a final check on missing values
-sapply(forum_cleaned, function(x) sum(is.na(x)))
+#sapply(forum_cleaned, function(x) sum(is.na(x)))
 
 write_csv(forum_cleaned, "Data/forum_cleaned.csv")
 ```
@@ -425,6 +420,8 @@ Final summary of drops (we started with n = 8916)
 - courses with missing surveys (~2100)
 
 - 0 faculty/ta (~600)
+
+  - student data on these is still good in case we need/want it at some point
 
 - faculty length outliers (~200)
 
