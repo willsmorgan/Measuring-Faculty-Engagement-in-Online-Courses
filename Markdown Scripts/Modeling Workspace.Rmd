@@ -39,11 +39,8 @@ the potential feature space. Instead, we will adopt methods that help us in sele
 appropriate features.
 
 ```{r load prep data}
-# Load and factorize
-forum <- read_csv("Data/forum_cleaned.csv", col_types = cols()) %>%
-  mutate(session_a = if_else(session_code == "A", 1, 0)) %>%          # create binary for session
-  mutate_at(vars(session_a, has_hallway, upper_division), as.factor) %>%
-  select(-session_code)
+survey_drop = FALSE
+source("Code/Sample Selection.R", local = TRUE)
 
 # Create matrix for correlation analysis
 forum_mat <- forum %>%
@@ -100,11 +97,9 @@ discussion forums:
 
 - number of posts per student (over the entire course)
 
-- average length of posts made by students
-
 - consistency of student posts (from week to week)
 
-  - variance of the number of posts in week X
+  - variance of the number of posts from week to week
 
 
 Notes:
@@ -122,10 +117,43 @@ With that said, we can still use things that are fixed or occur during the cours
 Class sizes, existence of hallway forums, faculty activity, and others can all
 be a part of this question.
 
-Another caveat with this question is that our sample won't depend on missing 
-values for the course survey data. This should add in at least 2100 new observations,
-given that those also do not have missing data for any of the other variables we
-are using.
+```{r rq1 sample}
+survey_drop = FALSE
+source("Code/Sample Selection.R", local = TRUE)
+
+
+
+
+
+```
+***
+
+## __Research Question 2:__
+
+How do student outcomes change with the level of engagement in online forums?
+If there is a change, it is independent of who is doing the posting?
+
+keep it simple; just use pass_rate and avg_gpa
+
+we need all drops
+
+```{r rq2 sample}
+survey_drop = TRUE
+source("Code/Sample Selection.R", local = TRUE)
+
+
+
+```
+
+
+***
+
+## __Research Question 3:__
+
+Is the importance of faculty engagement constant throughout the course or are
+there specific points in time where students benefit more from faculty engagement?
+
+not gonna touch for now and just try to address it in rq2
 
 ***
 
