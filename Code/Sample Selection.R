@@ -12,14 +12,23 @@ forum <- read_excel('Data/20180405 Fac Engagement.xlsx', sheet = 1)
 names(forum) <- str_to_lower(names(forum))
 
 forum <- forum %>%
-  select(-c(cour_st_dt, cour_end_dt, cem_unique)) %>%
+  select(-c(cour_st_dt, cour_end_dt, cem_unique, total_len_fac_ta_posts)) %>%
   rename(session_code = term_session,
          course_id = myasu_course) %>%
   mutate(subject = str_sub(course, 1, 3), 
          catalog_nbr = str_sub(course, 4, 6),
          course = paste(subject, catalog_nbr, sep = '|'),
-         enrl_total = pass_ct + wdwn_ct + fail_ct)
+         enrl_total = pass_ct + wdwn_ct + fail_ct,
+         num_fac_ta_posts = num_fac_posts_wk0 + num_fac_posts_wk1 + num_fac_posts_wk2 +
+           num_fac_posts_wk3 + num_fac_posts_wk4 + num_fac_posts_wk5 + 
+           num_fac_posts_wk6 + num_fac_posts_wk7 + num_fac_posts_wk8 + 
+           num_fac_posts_wk9 + num_fac_posts_wk10 + num_fac_posts_wk11 +
+           num_fac_posts_wk12 + num_fac_posts_wk13 + num_fac_posts_wk14 +
+           num_fac_posts_wk15)
 
+
+# Note: choose to recreate total num of faculty posts during course here 
+# so that we can get rid of observations that do not have any posts
 
 ### 2. Dropping observations
 
@@ -35,19 +44,18 @@ forum <- forum %>%
 forum <- forum %>% filter(enrl_total >= 5)
 
 # Missing survey data
-if (survey_drop) forum <-  forum %>% filter(!is.na(num_evals_expected))
+# forum <-  forum %>% filter(!is.na(num_evals_expected))
 
 # Missing faculty data
 forum <- filter(forum, num_fac_ta > 0)
-
-# Total faculty post length outliers
-forum <- forum %>%
-  filter(total_len_fac_ta_posts <= quantile(total_len_fac_ta_posts, .95))
 
 # Student post outliers
 forum <- forum %>%
   filter(num_stu_posts <= quantile(num_stu_posts, .95))
 
+# Courses without any faculty posts
+forum <- forum %>%
+  filter(num_fac_ta_posts > 0)
 
 ### 3. Global variable changes
 
@@ -61,15 +69,13 @@ forum <- forum %>%
   mutate_at(questions, as.numeric)
 
 # Student and Faculty post consistency
-
 ### This variable is defined as 1/var(num_posts_per_student in week x). The variance
 ### measures how consistent students and faculty are in posting every week, and 
 ### we then take the reciprocal of the value so it is easier to interpret.
 
 ### Larger values mean more consistent number of posts per student or faculty
 ### from week to week
-
-p <- select(forum,
+stu_consistency <- select(forum,
             num_stu_posts_wk0,
             num_stu_posts_wk1,
             num_stu_posts_wk2,
@@ -87,7 +93,7 @@ p <- select(forum,
   group_by(course_id) %>%
   summarise(stu_post_consistency = 1 / var(count))
 
-consistency <- select(forum,
+fac_consistency <- select(forum,
             num_fac_posts_wk0,
             num_fac_posts_wk1,
             num_fac_posts_wk2,
@@ -104,11 +110,25 @@ consistency <- select(forum,
             .funs = function(x) x / .$num_fac_ta) %>%
   group_by(course_id) %>%
   summarise(fac_post_consistency = 1 / var(count)) %>%
-  inner_join(p, by = 'course_id')
+  inner_join(stu_consistency, by = 'course_id')
 
+## Proportion of posts in the first 2 weeks of class
+fac_posts <- forum %>%
+  select(course_id, starts_with("num_fac_posts_wk")) %>%
+  mutate(tot_fac_posts = num_fac_posts_wk0 + num_fac_posts_wk1 + num_fac_posts_wk2 +
+           num_fac_posts_wk3 + num_fac_posts_wk4 + num_fac_posts_wk5 + 
+           num_fac_posts_wk6 + num_fac_posts_wk7 + num_fac_posts_wk8 + 
+           num_fac_posts_wk9 + num_fac_posts_wk10 + num_fac_posts_wk11 +
+           num_fac_posts_wk12 + num_fac_posts_wk13 + num_fac_posts_wk14 +
+           num_fac_posts_wk15,
+         prop_posts_boc = (num_fac_posts_wk0 + num_fac_posts_wk1 + num_fac_posts_wk2) / tot_fac_posts,
+         prop_posts_eoc = (num_fac_posts_wk6 + num_fac_posts_wk7 + num_fac_posts_wk8) / tot_fac_posts) %>%
+  select(course_id, prop_posts_boc, prop_posts_eoc, tot_fac_posts)
 
-# Add new variables
+## Join new variables and create final ones
 forum <- forum %>%
+  inner_join(fac_consistency, by = 'course_id') %>%
+  inner_join(fac_posts, by = 'course_id') %>%
   filter(session_code %in% c("A", "B")) %>%
   mutate(prop_stu_posted = num_stu_with_posts / enrl_total,
          session_a = if_else(session_code == "A", 1, 0),
@@ -117,51 +137,17 @@ forum <- forum %>%
          instr_score = (q_responded + q_present + q_feedback) / 3,
          design_score = (q_success + q_prepared + q_presentations + q_navigate) / 4,
          posts_per_student = num_stu_posts / enrl_total,
-         posts_per_fac = num_fac_ta_posts / num_fac_ta,
+         posts_per_fac = tot_fac_posts / num_fac_ta,
          pass_rate = pass_ct / enrl_total,
-         avg_fac_post_len = total_len_fac_ta_posts / num_fac_ta_posts,
          upper_division = if_else(
            as.numeric(str_sub(course, 5, 7)) >= 300, 1, 0),
-         fac_posts_boc = num_fac_posts_wk0 + num_fac_posts_wk1 + num_fac_posts_wk2,
-         fac_posts_eoc = num_fac_posts_wk6 + num_fac_posts_wk7 + num_fac_posts_wk8,
          pass_rate = pass_ct / enrl_total,
          response_rate = num_evals_taken / num_evals_expected) %>%
-  select(course_id, pass_rate, avg_gpa, wdrw_rate, session_a,
-         enrl_total, response_rate, has_hallway,
-         fac_posts_boc, fac_posts_eoc, total_len_fac_ta_posts,
-         instr_score, design_score, posts_per_fac,
-         posts_per_student, avg_fac_post_len, upper_division) %>%
-  inner_join(consistency, by = 'course_id') %>%
+  select(course_id, has_hallway, enrl_total, fac_post_consistency,
+         stu_post_consistency, prop_posts_boc, prop_posts_eoc,
+         session_a, avg_gpa, wdrw_rate, instr_score, design_score, posts_per_fac,
+         posts_per_student, pass_rate, upper_division) %>%
   mutate_at(vars(session_a, has_hallway, upper_division), as.factor)
 
-rm(p, consistency)
 
-
-
-
-
-
-#### just count the number of posts made in the duration of the course
-#### for a total count of the number of faculty posts
-
-
-mlem <- mutate(forum,
-                fac_tot = num_fac_posts_wk0 + 
-                  num_fac_posts_wk1 + 
-                  num_fac_posts_wk2 +
-                  num_fac_posts_wk3 +
-                  num_fac_posts_wk4 +
-                  num_fac_posts_wk5 +
-                  num_fac_posts_wk6 +
-                  num_fac_posts_wk7 +
-                  num_fac_posts_wk8 +
-                  num_fac_posts_wk9 + 
-                  num_fac_posts_wk10 +
-                 num_fac_posts_wk11 +
-                 num_fac_posts_wk12 +
-                 num_fac_posts_wk13 +
-                 num_fac_posts_wk14 +
-                 num_fac_posts_wk15,
-                incorrect = if_else(fac_tot != num_fac_ta_posts, 1, 0)) %>%
-  filter(incorrect == 1) %>%
-  select(course_id, fac_tot, num_fac_ta_posts, starts_with("num_fac_posts_wk"))
+rm(fac_consistency, fac_posts, stu_consistency)
