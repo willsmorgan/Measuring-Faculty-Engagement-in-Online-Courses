@@ -7,8 +7,10 @@ output: pdf_document
 
 ```{r setup, include=FALSE}
 rm(list = ls())
+
+set.seed(123)
 knitr::opts_chunk$set(echo = FALSE, fig.align = 'center')
-libs <- c('readxl', 'tidyverse', 'data.table', 'glmnet')
+libs <- c('readxl', 'tidyverse', 'data.table', 'glmnet', 'caret')
 lapply(libs, library, character.only = TRUE)
 ```
 
@@ -29,7 +31,7 @@ there specific points in time where students benefit more from faculty engagemen
 
 ## __Preliminary Feature Search__
 
-We have some expectations on which variables might carry the most signal, but it
+We have expectations on which variables might carry the most signal, but it
 is worth doing some investigation in case there is something we overlooked. Our
 first objective will be creating a correlation heat map of all the variables
 that we anticipate using, including the responses we wish to test.
@@ -39,7 +41,7 @@ the potential feature space. Instead, we will adopt methods that help us in sele
 appropriate features.
 
 ```{r load prep data}
-survey_drop = FALSE
+survey_drop = TRUE
 source("Code/Sample Selection.R", local = TRUE)
 
 # Create matrix for correlation analysis
@@ -118,12 +120,38 @@ Class sizes, existence of hallway forums, faculty activity, and others can all
 be a part of this question.
 
 ```{r rq1 sample}
-survey_drop = FALSE
 source("Code/Sample Selection.R", local = TRUE)
 
+forum <- forum %>%
+  select(session_a, enrl_total, has_hallway, prop_posts_boc,
+         prop_posts_eoc, posts_per_student, upper_division,
+         fac_post_consistency, posts_per_fac, stu_post_consistency)
+
+X <- select(forum , -posts_per_student, -stu_post_consistency)
+
+std_vals <- preProcess(X, method = c("center", "scale"))
+
+X <- predict(std_vals, X) %>%
+  data.matrix()
+
+pps <- select(forum, posts_per_student) %>%
+  data.matrix()
+
+stu_cons <- select(forum, stu_post_consistency) %>%
+  data.matrix()
+
+lambda <-  exp(seq(log(.000001), log(1000), length.out = 250))
+
+pps_mod <- cv.glmnet(X, pps,
+       family = 'gaussian',
+       standardize = FALSE,
+       lambda = lambda)
 
 
-
+cons_mod <- cv.glmnet(X, stu_cons,
+                      family = 'gaussian',
+                      standardize = FALSE,
+                      lambda = lambda)
 
 ```
 ***
@@ -138,11 +166,28 @@ keep it simple; just use pass_rate and avg_gpa
 we need all drops
 
 ```{r rq2 sample}
-survey_drop = TRUE
 source("Code/Sample Selection.R", local = TRUE)
 
+forum  <- forum %>%
+  select(-course_id, -wdrw_rate, -instr_score, -design_score)
 
+X <-  select(forum, -avg_gpa, -pass_rate)
 
+std_vals <- preProcess(X, method = c("center", "scale"))
+
+X <- predict(std_vals, X) %>%
+  data.matrix()
+
+gpa <- select(forum, avg_gpa) %>%
+  data.matrix()
+
+gpa_mod <- cv.glmnet(X, gpa,
+                     family = 'gaussian',
+                     standardize = FALSE,
+                     lambda = lambda)
+
+plot(gpa_mod)
+coef(gpa_mod, s = 'lambda.min')
 ```
 
 
@@ -153,7 +198,33 @@ source("Code/Sample Selection.R", local = TRUE)
 Is the importance of faculty engagement constant throughout the course or are
 there specific points in time where students benefit more from faculty engagement?
 
-not gonna touch for now and just try to address it in rq2
+what about withdrawal rate regressed on posts in boc???
+
+```{r rq3 sample}
+source("Code/Sample Selection.R", local = TRUE)
+
+forum  <- forum %>%
+  select(-c(course_id, prop_posts_eoc, avg_gpa, instr_score, design_score,
+            pass_rate))
+
+X <-  select(forum, -wdrw_rate)
+
+std_vals <- preProcess(X, method = c("center", "scale"))
+
+X <- predict(std_vals, X) %>%
+  data.matrix()
+
+wdrw <- select(forum, wdrw_rate) %>%
+  data.matrix()
+
+wdrw_mod <- cv.glmnet(X, wdrw,
+                     family = 'gaussian',
+                     standardize = FALSE,
+                     lambda = lambda)
+
+plot(wdrw_mod)
+coef(wdrw_mod, s = 'lambda.min')
+```
 
 ***
 
