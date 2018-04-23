@@ -44,7 +44,7 @@ forum <- forum %>%
 forum <- forum %>% filter(enrl_total >= 5)
 
 # Missing survey data
-# forum <-  forum %>% filter(!is.na(num_evals_expected))
+#forum <-  forum %>% filter(!is.na(num_evals_expected))
 
 # Missing faculty data
 forum <- filter(forum, num_fac_ta > 0)
@@ -151,3 +151,7 @@ forum <- forum %>%
 
 
 rm(fac_consistency, fac_posts, stu_consistency)
+
+# write_csv(forum, "R:\\Projects\\Faculty Engagement\\Data\\data_w_evals.csv")
+# write_csv(forum, "R:\\Projects\\Faculty Engagement\\Data\\data_wo_evals.csv")
+
