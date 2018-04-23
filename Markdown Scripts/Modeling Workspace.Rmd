@@ -10,7 +10,7 @@ rm(list = ls())
 
 set.seed(123)
 knitr::opts_chunk$set(echo = FALSE, fig.align = 'center')
-libs <- c('readxl', 'tidyverse', 'data.table', 'glmnet', 'caret')
+libs <- c('readxl', 'tidyverse', 'data.table', 'glmnet', 'caret', 'broom')
 lapply(libs, library, character.only = TRUE)
 ```
 
@@ -153,7 +153,40 @@ cons_mod <- cv.glmnet(X, stu_cons,
                       standardize = FALSE,
                       lambda = lambda)
 
+print("Lasso Estimates of Posts per Student Model")
+tidy(coef(pps_mod, s = 'lambda.min')) %>%
+  select(-column)
+
+print("Lasso Estimates of Student Post Consistency Model")
+tidy(coef(cons_mod, s = 'lambda.min')) %>%
+  select(-column)
+
 ```
+
+Because we are unable to directly get at the standard errors and p-values 
+for the lasso estimates, we use these results to inform a second model; just a 
+standard linear model.
+
+```{r rq1 lin mods}
+# change model data to df for glm()
+pps <- select(forum,-stu_post_consistency)
+cons <- select(forum, -posts_per_student, -prop_posts_eoc)
+
+pps_mod2 <- glm(posts_per_student ~ ., pps, family = 'gaussian') %>%
+  tidy() %>%
+  select(-statistic)
+
+cons_mod2 <- glm(stu_post_consistency ~ ., cons, family = 'gaussian') %>%
+  tidy() %>%
+  select(-statistic)
+
+print("Coefficient estimates from linear model with response: Posts per Student")
+pps_mod2
+
+print("Coefficient estimates from linear model with response: Student Post Consistency")
+cons_mod2
+```
+
 ***
 
 ## __Research Question 2:__
@@ -163,7 +196,6 @@ If there is a change, it is independent of who is doing the posting?
 
 keep it simple; just use pass_rate and avg_gpa
 
-we need all drops
 
 ```{r rq2 sample}
 source("Code/Sample Selection.R", local = TRUE)
@@ -186,8 +218,24 @@ gpa_mod <- cv.glmnet(X, gpa,
                      standardize = FALSE,
                      lambda = lambda)
 
-plot(gpa_mod)
-coef(gpa_mod, s = 'lambda.min')
+print("Lasso estimates of GPA model")
+tidy(coef(gpa_mod, s = 'lambda.min')) %>%
+  select(-column)
+```
+
+We repeat the same procedure from the previous research question to get more
+interpretable results. 
+
+```{r rq2 lin mods}
+gpa <- select(forum, -pass_rate)
+
+gpa_mod2 <- glm(avg_gpa ~ ., gpa, family = 'gaussian') %>%
+  tidy() %>%
+  select(-statistic)
+
+print("Coefficient Estimates for linear GPA model: ")
+gpa_mod2
+
 ```
 
 
@@ -262,3 +310,17 @@ developing Q2, Q3 more so you know exactly what sample is needed in each
 go crazy
 
 - decide if you're going to extend the prelim feature analysis
+
+
+***
+
+## Extras:
+
+```{r, eval = FALSE}
+## Student Post Consistency Density Plot
+forum %>%
+  filter(stu_post_consistency <= quantile(stu_post_consistency, .95)) %>%
+  ggplot(aes(stu_post_consistency)) +
+  geom_density()
+
+```
