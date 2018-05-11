@@ -444,7 +444,7 @@ ggplot(high_low) +
        title = "Posts per Week") +
   theme(plot.title = element_text(hjust = .5))
 
-
+ggsave("Graphics/post consistency example.png")
 ```
 
 ```{r new variables}
