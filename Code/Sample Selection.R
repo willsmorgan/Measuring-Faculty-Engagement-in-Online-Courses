@@ -91,7 +91,7 @@ stu_consistency <- select(forum,
             .funs = function(x) x / .$enrl_total) %>%
   gather(posts, count, starts_with("num_stu")) %>%
   group_by(course_id) %>%
-  summarise(stu_post_consistency = 1 / var(count))
+  summarise(stu_post_consistency = 1 / sqrt(var(count)))
 
 fac_consistency <- select(forum,
             num_fac_posts_wk0,
@@ -109,7 +109,7 @@ fac_consistency <- select(forum,
   mutate_at(vars(starts_with("num_fac")),
             .funs = function(x) x / .$num_fac_ta) %>%
   group_by(course_id) %>%
-  summarise(fac_post_consistency = 1 / var(count)) %>%
+  summarise(fac_post_consistency = 1 / sqrt(var(count))) %>%
   inner_join(stu_consistency, by = 'course_id')
 
 ## Proportion of posts in the first 2 weeks of class
