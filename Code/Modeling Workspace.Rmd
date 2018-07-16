@@ -9,7 +9,7 @@ output: pdf_document
 rm(list = ls())
 
 set.seed(123)
-knitr::opts_chunk$set(echo = FALSE, fig.align = 'center')
+knitr::opts_chunk$set(echo = FALSE, fig.align = 'center', eval = FALSE)
 libs <- c('readxl', 'tidyverse', 'data.table', 'glmnet', 'caret', 'broom')
 lapply(libs, library, character.only = TRUE)
 ```
@@ -20,158 +20,86 @@ What do we want to answer?
 
 - _Q1:_ Does faculty activity on discussion forums affect student engagement on forums?
 
-- _Q2:_ How do student outcomes change with the level of engagement in online forums?
-If there is a change, it is independent of who is doing the posting?
+- _Q2:_ Are grade outcomes affected by the level and timing of faculty activity 
+in discussion forums?
 
-***
-
-## __Preliminary Feature Search__
-This section will be relatively brief, as we prefer to avoid a deep dive into 
-the potential feature space. Instead, we will just use the Lasso on our original
-set of chosen variables and then run a plain linear model (without regularization) to get
-at the standard errors of the estimates.
-
-We have expectations on which variables might carry the most signal, but it
-is worth doing some investigation in case there is something we overlooked. Our
-first objective will be creating a correlation heat map of all the variables
-that we anticipate using, including the responses we wish to test.
-
-
-```{r load prep data}
-source("Code/Sample Selection.R", local = TRUE)
-
-# Create matrix for correlation analysis
-forum_mat <- forum %>%
-  select(-course_id) %>%
-  mutate_all(as.numeric) %>%
-  as.matrix
-
-```
-
-
-
-```{r correlation graph, message=FALSE, warning=FALSE}
-# Create correlation matrix and grab lower half
-cormat <- round(cor(forum_mat), 2)
-cormat[upper.tri(cormat)] <- NA
-
-# reshape for plotting
-cormat <- melt(cormat, na.rm = TRUE) %>%
-  rename(correlation = value)
-
-
-heatmap <- ggplot(cormat, aes(Var1, Var2, fill = correlation)) + 
-           geom_tile(color = 'white') +
-           scale_fill_gradient2(low = 'blue', high = 'red', mid = 'white',
-                                midpoint = 0, limit = c(-1, 1)) +
-           theme(axis.text.x = element_text(angle = 45,
-                                            vjust = 1,
-                                            size = 10,
-                                            hjust = 1),
-                 axis.title.x = element_blank(),
-                 axis.title.y = element_blank(),
-                 axis.ticks = element_blank(),
-                 panel.border = element_blank(),
-                 panel.background = element_blank(),
-                 legend.justification = c(1,0),
-                 legend.position = c(.5, .7),
-                 legend.direction = 'horizontal')
-
-# add labels to items with abs_val greater than .15
-heatmap + 
-  geom_text(data = cormat[abs(cormat$correlation) > .15, ],
-            aes(Var1, Var2, label = correlation),
-            color = 'black',
-            size = 3)
-ggsave("Graphics/correlation heatmap.png")
-```
-
-Nothing really jumps out that wasn't already expected. Obviously, positive grade 
-outcomes are negatively associated with poor grade outcomes. For the most
-part, almost none of the variables we anticipate using in the model have a strong
-correlation with the responses.
-
-(Not sure where to put the plot below so I'm keeping it here for now)
-
-```{r stu post const distr}
-## Student Post Consistency Density Plot
-forum %>%
-  filter(stu_post_consistency <= quantile(stu_post_consistency, .95)) %>%
-  ggplot(aes(stu_post_consistency)) +
-  geom_density(aes(y = ..density..), color = 'blue') + 
-  geom_histogram(aes(y = ..density..), alpha = .5, bins = 25) +
-  labs(x = "Student Post Consistency",
-       title = "Student Post Consistency Distribution") +
-  theme(plot.title = element_text(hjust = .5))
-ggsave("Graphics/Stu_Consist_Distr.png")
-```
-
+- _Q3:_ Do course evaluation scores fluctuate with the level of activity in a discussion
+forum?
 
 ***
 
 ## __Research Question 1__
-
-Does faculty activity on discussion forums affect student posting behavior?
-
-Based on the available data, we can use several metrics for student behavior on
+Based on the available data, we can use two metrics for student behavior on
 discussion forums:
 
-- number of posts per student (over the entire course)
+- number of posts per student over the entire course
 
-- consistency of student posts (from week to week)
+- consistency of student posts from week to week
 
   - variance of the number of posts from week to week
 
-
-Notes:
-
-We need to be careful about what we choose to include in these models because some
-things might not be interpretable in a meaningful way. If we were to use `pass_rate`
-as a predictor and find that it has a positive effect on say the number of posts
-per student, what would our interpretation be? That increasing the pass rate of 
-a course creates more student discussion? That's silly and feels like some sort
-of logical fallacy. 
-
-  - generally the problem is: A is caused by B even though B occurs after A 
-  
-With that said, we can still use things that are fixed or occur during the course.
-Class sizes, existence of hallway forums, faculty activity, and others can all
-be a part of this question.
-
-```{r rq1 sample}
+```{r}
+## Import data and select columns
 source("Code/Sample Selection.R", local = TRUE)
 
-forum <- forum %>%
-  select(session_a, enrl_total, has_hallway, prop_posts_boc,
-         prop_posts_eoc, posts_per_student, upper_division,
-         fac_post_consistency, posts_per_fac, stu_post_consistency)
+forum %<>% select(avg_fac_post_len, enrl_total, fac_post_consistency,
+                  has_hallway, posts_per_fac, posts_per_student, prop_posts_boc,
+                  session_a, stu_post_consistency, upper_division)
 
-X <- select(forum , -posts_per_student, -stu_post_consistency)
+
+## Standardize predictors
+X <- select(forum, -stu_post_consistency) %>%
+  model.matrix(posts_per_student ~ (.)-1, data = .)
+  
+Y <- forum$posts_per_student %>%
+  unlist()
+
+pps_mod <- cv.glmnet(X, Y, intercept = FALSE, alpha = 0)
+
+tidy(coef(pps_mod, s = 'lambda.1se'))
+```
+
+```{r rq1 sample}
+## Import data and select columns
+source("Code/Sample Selection.R", local = TRUE)
+
+forum %<>% select(avg_fac_post_len, enrl_total, fac_post_consistency,
+                  has_hallway, posts_per_fac, posts_per_student, prop_posts_boc,
+                  session_a, stu_post_consistency, upper_division)
+
+
+## Standardize predictors
+X <- select(forum , -posts_per_student, -stu_post_consistency) %>%
+  data.matrix()
 
 std_vals <- preProcess(X, method = c("center", "scale"))
 
-X <- predict(std_vals, X) %>%
-  data.matrix()
+# X <- predict(std_vals, X) %>%
+#   data.matrix()
 
+## Define model matrices for each model
 pps <- select(forum, posts_per_student) %>%
   data.matrix()
 
 stu_cons <- select(forum, stu_post_consistency) %>%
   data.matrix()
 
+## Define lambda sequence for testing
 lambda <-  exp(seq(log(.000001), log(1000), length.out = 250))
 
+## Run Models
 pps_mod <- cv.glmnet(X, pps,
        family = 'gaussian',
-       standardize = FALSE,
+       standardize = TRUE,
        lambda = lambda)
 
 
 cons_mod <- cv.glmnet(X, stu_cons,
                       family = 'gaussian',
-                      standardize = FALSE,
+                      standardize = TRUE,
                       lambda = lambda)
 
+## Print results
 print("Lasso Estimates of Posts per Student Model")
 tidy(coef(pps_mod, s = 'lambda.min')) %>%
   select(-column)

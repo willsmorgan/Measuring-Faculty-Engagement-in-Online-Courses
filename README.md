@@ -16,16 +16,20 @@ were Phil Arcuria, Patrick Pettyjohn, and Mike Sharkey.
 
 #### Notes
 
-There are three documents in this repository detailing our findings -
+There are four documents in this repository detailing our findings -
 
-1. Exploratory_Analysis.pdf
-    * EDA of the discussion forum data; discusses missing data, basic distributions,
-    and drops we made in order to move on to modeling
+1. Data_Inspection.pdf
+    * A relatively short search through the data for potential problems; discusses
+     missing data, basic distributions, and drops we made in order to move on to modeling
 
-2. Modeling_Workspace.pdf
+2. Exploratory_Analysis.pdf
+    * EDA of the discussion forum data - searching for features potentially
+    related to the various outcomes we are interested in
+
+3. Modeling_Workspace.pdf
     * Any modeling done by myself is cataloged here; this does not contain all of
     the information contained in the final paper.
 
-3. Paper_Final.pdf
+4. Paper_Final.pdf
     * A complete write-up of our findings; includes work not necessarily contained
     in this repo
