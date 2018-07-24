@@ -21,33 +21,35 @@ inform our approach to modeling later.
 
 Forms of engagement to inspect:
 
-  - Presence of a Hallway Conversation board
-    
-    - Blackboard discussion forums sometimes have boards to emulate hallway
-    conversations. These boards are meant to imitate natural discussion that
-    would happen between students and instructors between classes
-    
-  - Faculty Post Consistency
+  - Faculty Post Consistency (`fac_consistency`)
   
-  - Post Quantity
+  - Post Quantity (`ppf`)
+  
+  - Post Timing (`prop_posts_boc`)
+  
+    - The proportion of posts in the course that happen in the first two weeks
+    
+  - Post Length (`avg_fac_len`)
   
 Outcomes of interest:
 
-  - Student Perception of Faculty Engagement (`instr_score`)
+  - Student Engagement:
   
-    - These scores come from course evaluations; there are three questions
-    pertaining to faculty presence and engagement which we average into
-    a single score
+    - Posts per student (`pps`)
     
-  - Student Posts (`posts_per_student`)
+    - Student post consistency (`stu_consistency`)
+    
+  - Grade Outcomes:
   
-    - The average number of posts per student throughout the duration of the course
+    - Average grade received (`avg_grade`)
     
-  - Student Posts Consistency (`stu_post_consistency`)
+    - Withdrawal rates (`wdrw_rate`)
     
-  - Student Grades (`avg_grade`)
-  
-    - Average grade received in a course-section
+  - Instructor evaluation scores (`instr_score`)
+
+    - there are three questions on course evaluation surveys pertaining to
+    faculty presence and engagement which we average into a single score
+    
 
 ## General Outline
 
@@ -64,6 +66,7 @@ Before moving on, let's preview the data to remind ourselves what we'll be worki
 with.
 
 ```{r, include = FALSE}
+survey_drop = TRUE
 source("Code/Sample Selection.R")
 
 ```
@@ -120,15 +123,14 @@ heatmap +
 
 `instr_score` appears to be unrelated with every variable we
 were considering to include in a regression model. This doesn't mean we should 
-throw it out necessarily, but it does indicate that is has a very very weak linear
-association with all other variables.` posts_per_student` has
-a somewhat negative relationship with the number of students in the course and
-a slightly negative correlation with the proportion of faculty posts in the
-first two weeks (`prop_posts_boc`) but for the most part the situation is the
-same. `avg_grade` unfortunately appears to be just as uncorrelated as the other
-outcomes. We'll have to move on to doing more general plots to uncover something.
-Just like the others, `stu_post_consistency` does not seem to have any strong
-correlations with the explanatory variables.
+throw it out as an outcome, but it does indicate that is has a very weak linear
+association with all other variables. `pps` has a slightly negative relationship
+with the number of students in the course and a positive one with `ppf`. 
+`avg_grade` unfortunately appears to be uncorrelated with all forms
+of faculty engagement. We'll have to move on to doing more general plots to uncover something.
+Just like the others, `stu_consistency` does not seem to have any strong
+correlations with the explanatory variables besides the class size. Lastly, the
+withdrawal rate and posts per faculty variables have a slight positive relationship.
 
 
 ***
@@ -147,8 +149,8 @@ scatter <- function(x, y, title) {
     theme(plot.title = element_text(hjust = 0.5))
 }
 
-cont_vars <- c("avg_fac_post_len", "enrl_total", "fac_post_consistency",
-               "posts_per_fac", "prop_posts_boc", "prop_posts_eoc")
+cont_vars <- c("avg_fac_len", "enrl_total", "fac_consistency",
+               "ppf", "prop_posts_boc")
 ```
 
 ### __Instructor Score plots__
@@ -179,21 +181,21 @@ for (i in seq_along(cont_vars)) {
 ### __Posts per Student__
 ```{r, fig.dim = c(6, 4)}
 for (i in seq_along(cont_vars)) {
-  print(scatter(cont_vars[i], "posts_per_student", paste(cont_vars[i], "vs. Posts per Student")))
+  print(scatter(cont_vars[i], "pps", paste(cont_vars[i], "vs. Posts per Student")))
 }
 ```
 
 #### Discussion
 
   - Disappointingly, none of the variables here seem to be strongly related
-  to the number of posts per student. This seems to be completely opposite to
-  our expectations, but at the very least we now have some reason to start looking
-  for other possible explanations
+  to the number of posts per student. The average faculty post length seems 
+  to have a small positive relationship while `enrl_total` and `fac_consistency`
+  have a share a negative one.
   
 ## __Student Post Consistency__
 ```{r, fig.dim = c(6, 4)}
 for (i in seq_along(cont_vars)) {
-  print(scatter(cont_vars[i], "stu_post_consistency", paste(cont_vars[i], "vs. Student Post Consistency")))
+  print(scatter(cont_vars[i], "stu_consistency", paste(cont_vars[i], "vs. Student Post Consistency")))
 }
 ```
 
@@ -233,29 +235,29 @@ box <- function(x, y, title) {
 
 ### __Instructor Score__
 ```{r, fig.dim = c(6, 4)}
-for (i in c("has_hallway", "session_a", "upper_division")) {
+for (i in c("hallway", "upper_division")) {
   print(box(i, "instr_score", paste(i, "vs Instructor Score")))
 }
 ```
 
 ### __Average Grade__
 ```{r, fig.dim = c(6, 4)}
-for (i in c("has_hallway", "session_a", "upper_division")) {
+for (i in c("hallway", "upper_division")) {
   print(box(i, "avg_grade", paste(i, "vs Average Grade")))
 }
 ```
 
 ### __Posts per Student__
 ```{r, fig.dim = c(6, 4)}
-for (i in c("has_hallway", "session_a", "upper_division")) {
-  print(box(i, "posts_per_student", paste(i, "vs Posts per Student")))
+for (i in c("hallway", "upper_division")) {
+  print(box(i, "pps", paste(i, "vs Posts per Student")))
 }
 ```
 
 ### __Student Post Consistency__
 ```{r, fig.dim = c(6, 4)}
-for (i in c("has_hallway", "session_a", "upper_division")) {
-  print(box(i, "posts_per_student", paste(i, "vs Student Post Consistency")))
+for (i in c("hallway", "upper_division")) {
+  print(box(i, "stu_consistency", paste(i, "vs Student Post Consistency")))
 }
 ```
 
