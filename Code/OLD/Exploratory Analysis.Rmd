@@ -1,0 +1,295 @@
+---
+title: "Engagement EDA"
+author: "William Morgan"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+rm(list = ls())
+knitr::opts_chunk$set(echo = FALSE, fig.align = 'center', fig.dim = c(3.5,3.5))
+
+libs <- c('readxl', 'tidyverse', 'data.table', 'gridExtra', 'stringr', 'magrittr')
+lapply(libs, library, character.only = TRUE)
+```
+
+## Purpose:
+
+Run preliminary correlational analyses to uncover possible relationships
+between student outcomes and various measures of faculty engagement. This will
+inform our approach to modeling later.
+
+Forms of engagement to inspect:
+
+  - Faculty Post Consistency (`fac_consistency`)
+  
+  - Post Quantity (`ppf`)
+  
+  - Post Timing (`prop_posts_boc`)
+  
+    - The proportion of posts in the course that happen in the first two weeks
+    
+  - Post Length (`avg_fac_len`)
+  
+Outcomes of interest:
+
+  - Student Engagement:
+  
+    - Posts per student (`pps`)
+    
+    - Student post consistency (`stu_consistency`)
+    
+  - Grade Outcomes:
+  
+    - Average grade received (`avg_grade`)
+    
+    - Withdrawal rates (`wdrw_rate`)
+    
+  - Instructor evaluation scores (`instr_score`)
+
+    - there are three questions on course evaluation surveys pertaining to
+    faculty presence and engagement which we average into a single score
+    
+
+## General Outline
+
+The goal is to understand which features correlate most with the several
+outcomes. As a first pass we'll create a correlation heatmap relating the continuous features
+to each of the outcomes. This will give us some basic insight on any apparent linear
+relationships. Next we'll move on to plotting the features individually to get a 
+sense of any nonlinear relationships. In particular, we are looking for evidence
+favoring the inclusion of polynomial terms in a regression. We'll conclude with
+similar plots for the categorical variables (i.e. plotting a feature against a
+particular outcome).
+
+Before moving on, let's preview the data to remind ourselves what we'll be working
+with.
+
+```{r, include = FALSE}
+survey_drop = TRUE
+source("Code/Sample Selection.R")
+
+```
+
+```{r}
+str(forum)
+```
+
+***
+ 
+## Correlation Heatmap
+
+```{r, fig.dim = c(7, 5)}
+forum_mat <- forum %>%
+  select_if(is.numeric) %>%
+  select(order(colnames(.))) %>%
+  as.matrix
+
+# Create correlation matrix and grab lower half
+cormat <- round(cor(forum_mat), 2)
+cormat[upper.tri(cormat)] <- NA
+
+# reshape for plotting
+cormat <- melt(cormat, na.rm = TRUE) %>%
+  rename(correlation = value)
+
+
+heatmap <- ggplot(cormat, aes(Var1, Var2, fill = correlation)) + 
+           geom_tile(color = 'white') +
+           scale_fill_gradient2(low = 'blue', high = 'red', mid = 'white',
+                                midpoint = 0, limit = c(-1, 1)) +
+           theme(axis.text.x = element_text(angle = 45,
+                                            vjust = 1,
+                                            size = 10,
+                                            hjust = 1),
+                 axis.title.x = element_blank(),
+                 axis.title.y = element_blank(),
+                 axis.ticks = element_blank(),
+                 panel.border = element_blank(),
+                 panel.background = element_blank(),
+                 legend.justification = c(1,0),
+                 legend.position = c(.5, .7),
+                 legend.direction = 'horizontal')
+
+# add labels to items with abs_val greater than .15
+heatmap + 
+  geom_text(data = cormat[abs(cormat$correlation) > 0.1, ],
+            aes(Var1, Var2, label = correlation),
+            color = 'black',
+            size = 3)
+```
+
+### Discussion
+
+`instr_score` appears to be unrelated with every variable we
+were considering to include in a regression model. This doesn't mean we should 
+throw it out as an outcome, but it does indicate that is has a very weak linear
+association with all other variables. `pps` has a slightly negative relationship
+with the number of students in the course and a positive one with `ppf`. 
+`avg_grade` unfortunately appears to be uncorrelated with all forms
+of faculty engagement. We'll have to move on to doing more general plots to uncover something.
+Just like the others, `stu_consistency` does not seem to have any strong
+correlations with the explanatory variables besides the class size. Lastly, the
+withdrawal rate and posts per faculty variables have a slight positive relationship.
+
+
+***
+
+## Two-way plots
+
+```{r}
+scatter <- function(x, y, title) {
+  forum %>%
+    ggplot(aes(unlist(.[, x]), unlist(.[, y]))) +
+    geom_point(alpha = 0.3) +
+    geom_smooth(method = 'loess') +
+    labs(x = x,
+         y = y,
+         title = title) +
+    theme(plot.title = element_text(hjust = 0.5))
+}
+
+cont_vars <- c("avg_fac_len", "enrl_total", "fac_consistency",
+               "ppf", "prop_posts_boc")
+```
+
+### __Instructor Score plots__
+
+```{r, fig.dim = c(6, 4)}
+for (i in seq_along(cont_vars)) {
+  print(scatter(cont_vars[i], "instr_score", paste(cont_vars[i], "vs. Instructor Score")))
+}
+
+```
+#### Discussion
+
+  - Surprisingly, each of the six variables appears to have practically no effect
+  on the instructor evaluation scores
+
+### __Average Grade__
+```{r, fig.dim = c(6, 4)}
+# Grade Plots
+for (i in seq_along(cont_vars)) {
+  print(scatter(cont_vars[i], "avg_grade", paste(cont_vars[i], "vs. Average Grade")))
+}
+```
+#### Discussion
+
+  - Like the previous outcome, none of these plots suggest that the variables we 
+  thought to be important will be relevant in predicting grade.
+  
+### __Posts per Student__
+```{r, fig.dim = c(6, 4)}
+for (i in seq_along(cont_vars)) {
+  print(scatter(cont_vars[i], "pps", paste(cont_vars[i], "vs. Posts per Student")))
+}
+```
+
+#### Discussion
+
+  - Disappointingly, none of the variables here seem to be strongly related
+  to the number of posts per student. The average faculty post length seems 
+  to have a small positive relationship while `enrl_total` and `fac_consistency`
+  have a share a negative one.
+  
+## __Student Post Consistency__
+```{r, fig.dim = c(6, 4)}
+for (i in seq_along(cont_vars)) {
+  print(scatter(cont_vars[i], "stu_consistency", paste(cont_vars[i], "vs. Student Post Consistency")))
+}
+```
+
+#### Discussion
+
+  - It appears that for very low enrollment courses student post consistency
+  is higher than average. Other than this relatively small finding, the rest
+  of the variables do not appear to show any significant relation with student
+  post consistency.
+  
+***
+
+## Binary Variable Exploration
+
+Up until this point we've ignored the three binary variables in the data - 
+`has_hallway`, `session_a`, and `upper_division`. We defined the first earlier,
+and the last should be self-explanatory, but the second indicator tells us if the
+course-section occurred during the first 8-week session of the semester or the
+second. 
+
+Now that we have practically abandoned all hope with the continuous variables, 
+we need to see if the same pattern is going on with the binary variables.
+
+
+```{r}
+box <- function(x, y, title) {
+  forum %>%
+    ggplot(aes(unlist(.[, x]), unlist(.[, y]))) +
+    geom_boxplot() +
+    labs(x = x,
+         y = y,
+         title = title) +
+    theme(plot.title = element_text(hjust = 0.5))
+}
+```
+
+
+### __Instructor Score__
+```{r, fig.dim = c(6, 4)}
+for (i in c("hallway", "upper_division")) {
+  print(box(i, "instr_score", paste(i, "vs Instructor Score")))
+}
+```
+
+### __Average Grade__
+```{r, fig.dim = c(6, 4)}
+for (i in c("hallway", "upper_division")) {
+  print(box(i, "avg_grade", paste(i, "vs Average Grade")))
+}
+```
+
+### __Posts per Student__
+```{r, fig.dim = c(6, 4)}
+for (i in c("hallway", "upper_division")) {
+  print(box(i, "pps", paste(i, "vs Posts per Student")))
+}
+```
+
+### __Student Post Consistency__
+```{r, fig.dim = c(6, 4)}
+for (i in c("hallway", "upper_division")) {
+  print(box(i, "stu_consistency", paste(i, "vs Student Post Consistency")))
+}
+```
+
+#### Discussion
+
+Based on these plots, it is fair to say that we have evidence against using 
+any of these variables to explain variation in the outcomes. None of the box 
+plots revealed noticeable differences in outcomes between the levels of the binary
+indicator, so it is unlikely that they will be useful in a regression.
+
+***
+
+## Conclusion
+
+These are rather disappointing results, but this is not necessarily the end of the
+line. We can still move forward with some modeling to see if any sort of signal 
+can be extracted from these variables and if all else fails we can revisit 
+the data extraction and the feature engineering.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  

@@ -1,0 +1,210 @@
+---
+title: "Modeling Workspace"
+author: "William Morgan"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+rm(list = ls())
+
+set.seed(123)
+knitr::opts_chunk$set(echo = FALSE, fig.align = 'center', eval = FALSE)
+libs <- c('readxl', 'tidyverse', 'data.table', 'glmnet', 'caret', 'broom')
+lapply(libs, library, character.only = TRUE)
+```
+
+## __Problem Outline__
+
+How can we quantify the effects of faculty engagement in discussion boards of
+online courses?
+
+_Q1:_ Does faculty activity on discussion forums affect student engagement on forums?
+  
+_Q2:_ Are grade outcomes affected by faculty activity in discussion forums?
+
+_Q3:_ Do instructor evaluation scores fluctuate with the changes in the type
+and level of faculty engagement?
+
+
+***
+
+## __Research Question 1__
+Based on the available data, we use two metrics for student behavior on discussion forums:
+
+- number of posts per student over the entire course (`pps`)
+
+- consistency of student posts from week to week (`stu_consistency`)
+
+  - variance of the number of posts from week to week
+
+```{r}
+## Import data and select columns
+survey_drop = FALSE
+source("Code/Sample Selection.R", local = TRUE)
+
+pps_data <- select(forum, -avg_grade, -stu_consistency, -wdrw_rate)
+const_data <- select(forum, -avg_grade, -pps, -wdrw_rate)
+```
+
+```{r rq1 model selection}
+## Create Matrices
+X <- model.matrix(pps ~ (.)^2, pps_data)
+Y <- pps_data$pps %>%
+  data.matrix()
+
+## Define lambda sequence for testing
+lambda <-  exp(seq(log(.000001), log(1000), length.out = 250))
+
+## Run Models
+pps_mod <- cv.glmnet(X, Y,
+       family = 'gaussian',
+       standardize = TRUE,
+       lambda = lambda)
+
+## Print results
+print("Lasso Estimates of Posts per Student Model")
+tidy(pps_mod)
+```
+
+Because we are unable to directly get at the standard errors and p-values 
+for the lasso estimates, we use these results to inform a second model; just a 
+standard linear model.
+
+```{r rq1 lin mods}
+# change model data to df for glm()
+pps <- select(forum,-stu_post_consistency)
+cons <- select(forum, -posts_per_student, -prop_posts_eoc)
+
+pps_mod2 <- glm(posts_per_student ~ ., pps, family = 'gaussian') %>%
+  tidy() %>%
+  select(-statistic)
+
+cons_mod2 <- glm(stu_post_consistency ~ ., cons, family = 'gaussian') %>%
+  tidy() %>%
+  select(-statistic)
+
+print("Coefficient estimates from linear model with response: Posts per Student")
+pps_mod2
+
+print("Coefficient estimates from linear model with response: Student Post Consistency")
+cons_mod2
+```
+
+***
+
+## __Research Question 2:__
+
+How do student outcomes change with the level of engagement in online forums?
+If there is a change, it is independent of who is doing the posting?
+
+keep it simple; just use pass_rate and avg_gpa
+
+
+```{r rq2 sample}
+source("Code/Sample Selection.R", local = TRUE)
+
+forum  <- forum %>%
+  select(-course_id, -wdrw_rate, -instr_score, -design_score)
+
+X <-  select(forum, -avg_gpa, -pass_rate)
+
+std_vals <- preProcess(X, method = c("center", "scale"))
+
+X <- predict(std_vals, X) %>%
+  data.matrix()
+
+gpa <- select(forum, avg_gpa) %>%
+  data.matrix()
+
+gpa_mod <- cv.glmnet(X, gpa,
+                     family = 'gaussian',
+                     standardize = FALSE,
+                     lambda = lambda)
+
+print("Lasso estimates of GPA model")
+tidy(coef(gpa_mod, s = 'lambda.min')) %>%
+  select(-column)
+```
+
+We repeat the same procedure from the previous research question to get more
+interpretable results. 
+
+```{r rq2 lin mods}
+gpa <- select(forum, -pass_rate)
+
+gpa_mod2 <- glm(avg_gpa ~ ., gpa, family = 'gaussian') %>%
+  tidy() %>%
+  select(-statistic)
+
+print("Coefficient Estimates for linear GPA model: ")
+gpa_mod2
+
+```
+
+I don't exactly understand how to interpret the coefficients of `prop_posts_boc`
+and `prop_posts_eoc` when they are included in the same model, so it is worth running
+the model two more times using one variable at a time. The reason I think this is
+difficult to understand is because the two aren't entirely but pretty strongly
+dependent on one another. I didn't think this was a problem when I was looking
+at the correlation matrix, but now that the models are ran I realize this is kind
+of wonky.
+
+```{r rq2 eoc boc mods}
+gpa <- select(forum, -pass_rate, -prop_posts_eoc)
+
+gpa_mod_boc <- glm(avg_gpa ~ ., gpa, family = 'gaussian') %>%
+  tidy() %>%
+  select(-statistic)
+
+print("Coefficient Estimates for linear GPA model with only `prop_posts_boc`: ")
+gpa_mod_boc
+
+gpa <- select(forum, -pass_rate, -prop_posts_boc)
+
+gpa_mod_eoc <- glm(avg_gpa ~ ., gpa, family = 'gaussian') %>%
+  tidy() %>%
+  select(-statistic)
+
+print("Coefficient Estimates for linear GPA model with only `prop_posts_eoc`: ")
+gpa_mod_eoc
+
+```
+
+
+***
+
+
+## __Future Options__
+
+- can we add data about instructors making announcements?
+
+- what peoplesoft data can be used?
+
+
+***
+
+## __Working Notes__
+
+- research questions should be reordered; train of thought should be:
+
+  - does faculty activity on forums affect grade outcomes?
+  
+    - what characteristics of faculty activity have greatest effect? (early
+    course posts, late course posts, consistency of posting)
+
+  - does faculty activity on forums affect student activity on forums?
+  
+    - what student activity do we want to measure?
+    
+***
+
+
+
+
+
+
+
+
+
+
