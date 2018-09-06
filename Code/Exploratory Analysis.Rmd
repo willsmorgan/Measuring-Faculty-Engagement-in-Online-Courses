@@ -1,295 +1,236 @@
 ---
-title: "Engagement EDA"
-author: "William Morgan"
-date: "`r format(Sys.time(), '%d %B, %Y')`"
+title: "ASUO Forum Usage"
+author: "Will Morgan"
+date: "August 29, 2018"
 output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
-rm(list = ls())
-knitr::opts_chunk$set(echo = FALSE, fig.align = 'center', fig.dim = c(3.5,3.5))
+knitr::opts_chunk$set(echo = FALSE,
+                      message = FALSE,
+                      warning = FALSE)
 
-libs <- c('readxl', 'tidyverse', 'data.table', 'gridExtra', 'stringr', 'magrittr')
+libs <- c("data.table", "ggplot2", "knitr", "dplyr")
 lapply(libs, library, character.only = TRUE)
+
+path <- here::here("Data", "thread_cleaned.csv")
+data <- fread(path)
+
+# outside 99.9% quantile
+temp <- data %>%
+  filter(thread_participants <= 36,
+         thread_length <= 78,
+         student_responses <= 74,
+         stu_stu_resp <= 54,
+         stu_fac_resp <= 40,
+         thread_width <= 9,
+         parent_views <= 171,
+         thread_lifetime <= 180,                  # limit to within course
+         studs_in_thread <= 35)
 ```
 
-## Purpose:
+## Executive Summary
 
-Run preliminary correlational analyses to uncover possible relationships
-between student outcomes and various measures of faculty engagement. This will
-inform our approach to modeling later.
+laskjhdflaskjhlajhfg
 
-Forms of engagement to inspect:
 
-  - Faculty Post Consistency (`fac_consistency`)
-  
-  - Post Quantity (`ppf`)
-  
-  - Post Timing (`prop_posts_boc`)
-  
-    - The proportion of posts in the course that happen in the first two weeks
-    
-  - Post Length (`avg_fac_len`)
-  
-Outcomes of interest:
+## Motivation
 
-  - Student Engagement:
-  
-    - Posts per student (`pps`)
-    
-    - Student post consistency (`stu_consistency`)
-    
-  - Grade Outcomes:
-  
-    - Average grade received (`avg_grade`)
-    
-    - Withdrawal rates (`wdrw_rate`)
-    
-  - Instructor evaluation scores (`instr_score`)
+Forums are a feature used by nearly all ASU Online courses. Usage varies by 
+course type, but in many cases it is the only conduit for group communication
+amongst students and instructors. Hence, it is important to understand the types
+of interactions that are taking place and their relationship with observable
+outcomes so that we can inform instructional designers and instructors on factors
+that positively affect these outcomes. This preliminary research document intends
+to explore the nature of forum use with the use of thread-level data extracted 
+from Blackboard discussion forums. In particular, we are interested in understanding
+who is starting and participating in discussions, how long they are lasting, and
+how deep the conversations are. We also seek to understand the types of interactions
+that are occurring in forum threads as well as instructor responsiveness to student
+posts. 
 
-    - there are three questions on course evaluation surveys pertaining to
-    faculty presence and engagement which we average into a single score
-    
 
-## General Outline
+## Data Source
+Our data is gathered from 1.98 million forum threads and encompasses over 5.9 million
+posts. It spans 7750 Blackboard course-shells from Spring 2016 through Summer 2018
+and excludes graduate courses, leaving a total of 1100 unique courses. We use only
+Session A or Session B courses and exclude courses that have irregular course
+structures or grading schemes. Finally, we exclude posts of irregularly high length.
+After navigating to the individual forum webpage, we found that these
+types of posts were generally instructors disseminating huge amounts of information at
+once, so we determined that these posts were not of interest to this study as they
+did not represent an actual instance of instructor or student-led discussion.
 
-The goal is to understand which features correlate most with the several
-outcomes. As a first pass we'll create a correlation heatmap relating the continuous features
-to each of the outcomes. This will give us some basic insight on any apparent linear
-relationships. Next we'll move on to plotting the features individually to get a 
-sense of any nonlinear relationships. In particular, we are looking for evidence
-favoring the inclusion of polynomial terms in a regression. We'll conclude with
-similar plots for the categorical variables (i.e. plotting a feature against a
-particular outcome).
+*** 
 
-Before moving on, let's preview the data to remind ourselves what we'll be working
-with.
+\newpage
 
-```{r, include = FALSE}
-survey_drop = TRUE
-source("Code/Sample Selection.R")
+## Conversation Starters
 
-```
+We first want to observe how often each instructors and students are 
+starting threads, so that we can understand who is initiating discussions. In the overall
+sample, 97% of threads were made by students, indicating that students are
+the ones intiating most of the activity on discussion forums. This number should not
+necessarily raise any concerns about instrutor activity, as courses will often
+have entire forums dedicated to student-initiated threads. For instance, an instructor
+might create a forum where students post responses to an essay or discussion
+prompt found elsewhere in the course. 
+
+When we filter out threads that have less than 5 total posts, this proportion
+evens out slightly - 20% percent of threads with 5 or more posts are initiated by instructors.
+If we make this exclusion more strict and only look at threads with 10 or more posts,
+instructor-led threads actually dominate student-led threads, albeit only by 7%. In
+any case, the pattern seems to be that longer discussions tend to be initiated 
+by instructors rather than students.
 
 ```{r}
-str(forum)
+data %>%
+  mutate(`Thread Owner` = if_else(thread_owner_role == "P", "Instructor", "Student")) %>%
+  group_by(`Thread Owner`) %>%
+  summarise(`Number of Threads` = n(),
+            `Proportion of Threads` = n() / nrow(data)) %>%
+  kable(caption = "Thread Ownership")
 ```
-
-***
- 
-## Correlation Heatmap
-
-```{r, fig.dim = c(7, 5)}
-forum_mat <- forum %>%
-  select_if(is.numeric) %>%
-  select(order(colnames(.))) %>%
-  as.matrix
-
-# Create correlation matrix and grab lower half
-cormat <- round(cor(forum_mat), 2)
-cormat[upper.tri(cormat)] <- NA
-
-# reshape for plotting
-cormat <- melt(cormat, na.rm = TRUE) %>%
-  rename(correlation = value)
-
-
-heatmap <- ggplot(cormat, aes(Var1, Var2, fill = correlation)) + 
-           geom_tile(color = 'white') +
-           scale_fill_gradient2(low = 'blue', high = 'red', mid = 'white',
-                                midpoint = 0, limit = c(-1, 1)) +
-           theme(axis.text.x = element_text(angle = 45,
-                                            vjust = 1,
-                                            size = 10,
-                                            hjust = 1),
-                 axis.title.x = element_blank(),
-                 axis.title.y = element_blank(),
-                 axis.ticks = element_blank(),
-                 panel.border = element_blank(),
-                 panel.background = element_blank(),
-                 legend.justification = c(1,0),
-                 legend.position = c(.5, .7),
-                 legend.direction = 'horizontal')
-
-# add labels to items with abs_val greater than .15
-heatmap + 
-  geom_text(data = cormat[abs(cormat$correlation) > 0.1, ],
-            aes(Var1, Var2, label = correlation),
-            color = 'black',
-            size = 3)
-```
-
-### Discussion
-
-`instr_score` appears to be unrelated with every variable we
-were considering to include in a regression model. This doesn't mean we should 
-throw it out as an outcome, but it does indicate that is has a very weak linear
-association with all other variables. `pps` has a slightly negative relationship
-with the number of students in the course and a positive one with `ppf`. 
-`avg_grade` unfortunately appears to be uncorrelated with all forms
-of faculty engagement. We'll have to move on to doing more general plots to uncover something.
-Just like the others, `stu_consistency` does not seem to have any strong
-correlations with the explanatory variables besides the class size. Lastly, the
-withdrawal rate and posts per faculty variables have a slight positive relationship.
-
-
-***
-
-## Two-way plots
-
-```{r}
-scatter <- function(x, y, title) {
-  forum %>%
-    ggplot(aes(unlist(.[, x]), unlist(.[, y]))) +
-    geom_point(alpha = 0.3) +
-    geom_smooth(method = 'loess') +
-    labs(x = x,
-         y = y,
-         title = title) +
-    theme(plot.title = element_text(hjust = 0.5))
-}
-
-cont_vars <- c("avg_fac_len", "enrl_total", "fac_consistency",
-               "ppf", "prop_posts_boc")
-```
-
-### __Instructor Score plots__
-
-```{r, fig.dim = c(6, 4)}
-for (i in seq_along(cont_vars)) {
-  print(scatter(cont_vars[i], "instr_score", paste(cont_vars[i], "vs. Instructor Score")))
-}
-
-```
-#### Discussion
-
-  - Surprisingly, each of the six variables appears to have practically no effect
-  on the instructor evaluation scores
-
-### __Average Grade__
-```{r, fig.dim = c(6, 4)}
-# Grade Plots
-for (i in seq_along(cont_vars)) {
-  print(scatter(cont_vars[i], "avg_grade", paste(cont_vars[i], "vs. Average Grade")))
-}
-```
-#### Discussion
-
-  - Like the previous outcome, none of these plots suggest that the variables we 
-  thought to be important will be relevant in predicting grade.
-  
-### __Posts per Student__
-```{r, fig.dim = c(6, 4)}
-for (i in seq_along(cont_vars)) {
-  print(scatter(cont_vars[i], "pps", paste(cont_vars[i], "vs. Posts per Student")))
-}
-```
-
-#### Discussion
-
-  - Disappointingly, none of the variables here seem to be strongly related
-  to the number of posts per student. The average faculty post length seems 
-  to have a small positive relationship while `enrl_total` and `fac_consistency`
-  have a share a negative one.
-  
-## __Student Post Consistency__
-```{r, fig.dim = c(6, 4)}
-for (i in seq_along(cont_vars)) {
-  print(scatter(cont_vars[i], "stu_consistency", paste(cont_vars[i], "vs. Student Post Consistency")))
-}
-```
-
-#### Discussion
-
-  - It appears that for very low enrollment courses student post consistency
-  is higher than average. Other than this relatively small finding, the rest
-  of the variables do not appear to show any significant relation with student
-  post consistency.
-  
-***
-
-## Binary Variable Exploration
-
-Up until this point we've ignored the three binary variables in the data - 
-`has_hallway`, `session_a`, and `upper_division`. We defined the first earlier,
-and the last should be self-explanatory, but the second indicator tells us if the
-course-section occurred during the first 8-week session of the semester or the
-second. 
-
-Now that we have practically abandoned all hope with the continuous variables, 
-we need to see if the same pattern is going on with the binary variables.
 
 
 ```{r}
-box <- function(x, y, title) {
-  forum %>%
-    ggplot(aes(unlist(.[, x]), unlist(.[, y]))) +
-    geom_boxplot() +
-    labs(x = x,
-         y = y,
-         title = title) +
-    theme(plot.title = element_text(hjust = 0.5))
-}
+data %>%
+  filter(thread_length >= 5) %>%
+  mutate(`Thread Owner` = if_else(thread_owner_role == "P", "Instructor", "Student")) %>%
+  group_by(`Thread Owner`) %>%
+  summarise(`Number of Threads` = n(),
+            `Proportion of Threads` = n() / nrow(filter(data, thread_length >= 5))) %>%
+  kable(caption = "Ownership of threads with 5 or more posts")
+
+data %>%
+  filter(thread_length >= 10) %>%
+  mutate(`Thread Owner` = if_else(thread_owner_role == "P", "Instructor", "Student")) %>%
+  group_by(`Thread Owner`) %>%
+  summarise(`Number of Threads` = n(),
+            `Proportion of Threads` = n() / nrow(filter(data, thread_length >= 10))) %>%
+  kable(caption = "Ownership of threads with 10 or more posts")
+
 ```
 
 
-### __Instructor Score__
-```{r, fig.dim = c(6, 4)}
-for (i in c("hallway", "upper_division")) {
-  print(box(i, "instr_score", paste(i, "vs Instructor Score")))
-}
+
+## Thread Participants
+
+We have a sense of the types of users creating threads, so we now must 
+check how many people are actually participating in them. On average, less
+than 3 users are participating in any given thread. Furthermore, almost 84% of all
+threads have 3 or less users and 32% have only a single user. To add to this,
+95% of the posts made in the average thread are made by students. On the whole, this
+seems to indicate that ASU Online discussion forums are being used primarily
+for communication between very small groups of students. Our data does not contain
+the actual written content of the posts, but a reasonable explanation for this pattern
+might be that each thread is generally one student replying to a discussion prompt,
+and another student (and possibly a third) replying to that initial post. If we restrict
+our sample to threads with at least one faculty post, the balance between student
+and faculty posts evens out significantly. However, a majority of these threads
+still have only a few participants, meaning that most faculty engagement
+is amongst small groups of students.
+
+
+```{r}
+data %>%
+  select(thread_participants, pr_posts_stu, pr_posts_fac) %>%
+  rename(`Number of Participants` = thread_participants,
+         `Proportion of posts made by Students` = pr_posts_stu,
+         `Proportion of posts made by Faculty` = pr_posts_fac) %>%
+  summary() %>%
+  kable(caption = "Student and Faculty thread participation")
+
+data %>%
+  filter(num_fac_posts >= 1) %>%
+  select(thread_participants, pr_posts_stu, pr_posts_fac) %>%
+  rename(`Number of Participants` = thread_participants,
+         `Proportion of posts made by Students` = pr_posts_stu,
+         `Proportion of posts made by Faculty` = pr_posts_fac) %>%
+  summary() %>%
+  kable(caption = "Thread participation with at least one faculty post")
 ```
 
-### __Average Grade__
-```{r, fig.dim = c(6, 4)}
-for (i in c("hallway", "upper_division")) {
-  print(box(i, "avg_grade", paste(i, "vs Average Grade")))
-}
+To further corroborate these findings, 66% of threads have at most 2 students
+and 85% have no more than 3. Given this and the findings of tables 4 and 5, it 
+is fair to assume that most discussion forum threads are made up of relatively
+small, student-majority groups. It also appears that there is not much
+conversation happening between students - a large majority of the threads have only 
+one post per student. This is further evidence for the "post and a reply" working
+theory and detracts from the notion that discussion forums are used to simulate
+natural conversations that occur in the physical classroom.
+
+
+```{r}
+data %>%
+  select(studs_in_thread, posts_per_student) %>%
+  rename(`Number of students in thread` = studs_in_thread,
+         `Posts per student` = posts_per_student) %>%
+  summary() %>%
+  kable(caption = "Student thread participation")
+
 ```
 
-### __Posts per Student__
-```{r, fig.dim = c(6, 4)}
-for (i in c("hallway", "upper_division")) {
-  print(box(i, "pps", paste(i, "vs Posts per Student")))
-}
+With that said, it is important to recognize that students need not be actively
+posting to see the content being written. It can still be beneficial for someone to
+see what faculty and other students are writing, even if they are not part of a thread.
+"Lurkers", as they are commonly referred to, are users who do exactly this - 
+they read the ongoing conversation without participating. Although they may
+not be outwardly expressing themselves, exposure to the differing opinions
+of their peers and instructors can force students to think more critically
+about course content. Although we are unable to directly observe lurking, we can
+see how many times a parent post has been viewed. So, if a thread has far more
+views than it does posts, we could assume that some of this viewing is being 
+done by lurkers. Of course, this could also mean that the people posting are returning
+to the thread to check for responses, but the point is that having more views
+than posts allows for the possibility of lurking. In the data, we actually
+observe this phenomenon pretty frequently. About 60% of the data has twice as many
+views as it does posts, suggesting that lurking might be a common feature of
+ASUO forums.
+
+
+```{r}
+cat("Median ratio of views to number of posts: ", round(median(data$parent_views / data$thread_length, na.rm = TRUE), 2))
 ```
-
-### __Student Post Consistency__
-```{r, fig.dim = c(6, 4)}
-for (i in c("hallway", "upper_division")) {
-  print(box(i, "stu_consistency", paste(i, "vs Student Post Consistency")))
-}
-```
-
-#### Discussion
-
-Based on these plots, it is fair to say that we have evidence against using 
-any of these variables to explain variation in the outcomes. None of the box 
-plots revealed noticeable differences in outcomes between the levels of the binary
-indicator, so it is unlikely that they will be useful in a regression.
 
 ***
 
-## Conclusion
+## Thread Length
 
-These are rather disappointing results, but this is not necessarily the end of the
-line. We can still move forward with some modeling to see if any sort of signal 
-can be extracted from these variables and if all else fails we can revisit 
-the data extraction and the feature engineering.
+So far we've established that forum threads are generally student-initiated
+and have only a few participants. These findings don't necessarily imply that
+thread activity is lacking -  it could simply be that conversations among smaller
+groups of students are more common than larger groups. We touched on thread length
+in table 6 and expand on it here to continue developing our understanding of the "average"
+thread. 
 
-
-
-
-
-
-
-
-
-
+```{r}
+data %>%
+  select(thread_length) %>%
+  summary() %>%
+  kable()
 
 
+```
 
 
 
-  
-  
+
+
+
+```{r}
+log <- file("thread_log.txt", open = 'wt')
+
+data <- as.data.frame(data)
+# Send summaries of variables to the log
+for (i in seq_along(data)){
+  if (is.numeric(unlist(data[, i]))) {
+    cat("\n", file = log)
+    cat(names(data)[i], "\n", file = log)
+    capture.output(summary(data[, i]), file = log)
+  }
+}
+
+close(log)
+```
+
