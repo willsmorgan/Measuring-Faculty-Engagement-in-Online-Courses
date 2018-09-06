@@ -1,0 +1,150 @@
+How does instructor interaction in discussion forums affect student outcomes in fully online courses?
+
+1. Introduction:
+
+1a. Instructor presence
+
+It is well documented that instructor presence is critical for 
+positive student outcomes. Proper facilitation can 
+affect the quality and frequency of vital interactions students
+have amongst themselves, with content, and with instructors [citation needed]. The 
+Community of Inquiry (CoI) model frames this idea in a larger context,
+specifying that instructor/teaching presence is part of a more general
+conceptualization of the educational experience [Garrison, Anderson, Archer 2000]. In the 
+CoI framework, teaching presence is one of three essential components to 
+a student's education and is defined as, "the design, facilitation, and direction of cognitive and social
+processes for the purpose of realizing personally meaningful and educationally worthwhile
+learning outcomes" [Anderson, Rourke, Garrison, Archer 2001]. In other words, 
+teaching presence is a supportive role meant for curating and disseminating content,
+assessing student understanding, and providing constructive feedback. 
+Teaching presence in this regard directly contribute to students' perceptions
+of support, perceptions of learning, and their final grades [Arbaugh 2014]. In fact,
+instructor activity may account for the most significant impact on students' 
+academic outcomes [Rockinson-Szapiw et. al, 2016]. Marks, Sibley, and Arbaugh
+found that instructor-student interaction in online courses is more important than
+student-student or student-content interaction [Marks, Sibley, Arbaugh 2005]. In
+any case, direct instructor facilitation is a necessity for deep and meaningful learning [Garrison, Cleveland-Innes 2005].
+
+
+1b. Role of online discussions
+
+In an online environment with high transactional distance between students and
+faculty, the discussion forum has an important role in fostering interpersonal
+interaction. The asynchronous learning platform inherently limits this kind of 
+interaction and thus special care must be taken to sustain cognitive and social
+presence in the course. In particular, instructors must be able to facilitate
+student-driven learning:
+
+	"Facilitation is the facet of teaching presence that ensures
+	that social presence is established among community members and, in turn, that
+	cognitive processes are directed to personally meaningful and educationally 
+	worthwhile outcomes" [Vaughan, Cleveland-Innes, Garrison 2013].
+
+Interpersonal interaction, though well-intended, may not always create
+downstream positive effects on creating (sustaining?) an effective CoI. 
+The literature has recently focused more intently on evaluating the quality
+of such interaction, presuming that the mere existence of student-student and
+student-instructor communcation is not sufficient for impacting student learning [Jaggars, Xu 2016].
+This echoes thoughts expressed in [Garrison, Cleveland-Innes, 2005]:
+
+	"...interaction is not a guarantee that
+	students are cognitively engaged in an educationally meaningful manner.
+	High levels of interaction may be reflective of group cohesion, but it does
+	not directly create cognitive development or facilitate meaningful learning
+	and understanding. Interaction directed to cognitive outcomes is characterized
+	more by the qualitative nature of the interaction and less by quantitative
+	measures."
+
+Instead, effective interaction must have a clear purpose and facilitate content delivery [Naidu 2013].
+In the context of forums, instructors must be well-informed about the nature of the 
+course and circumstances of their students in order to design an environment that
+fosters meaningful discussion. By designing discussion activities that account
+for differences in student needs, expectations, and concerns, forums can overcome
+hurdles that may hinder student and instructor participation [Barran, Correia 2009].
+Results from one qualitative study of online conversations suggest that the quality
+(defined as being reflective of the student's belief and supported by sufficient evidence)
+of a post is the most important criterion for predicting direct responses [Ho, Swan 2007].
+Similarly, [Balaji, Chakrabarti 2010] found that the perceived richness of online discussion
+forums had significant positive effects on student participation, interaction, and learning.
+
+Although it is clear that effective forums require significant design considerations,
+the proper frequency, quality, and type of instructor intervention in this context is less 
+apparent. Tomkin and Charlevoix (2014) investigated in a randomly assigned A/B test the effect
+of instructor involvement in MOOC discussions on student outcomes and found that the
+instructor intervention had no statistically significant impact on completion rates,
+participation rates, or satisfaction with the course. The authors concluded that one
+explanation for this null result was that the course was highly structured and thus
+did not necessarily require high levels of student-instructor interaction. Yet, this
+phenomenon persists in other contexts as well. A separate study exploring the effects of
+online discussion in a sophomore-level university course found that interaction through
+discussion did not contribute significantly to students' perceptions of teaching
+and cognitive presence [Cho, Tobias, 2016]. Other research has even found a negative
+relationship between the number of student posts and the number of faculty posts [Mazzolini, Maddison 2007]. 
+Specifically, [Mazzolini and Maddison 2007] discovered that forums with a higher 
+number of faculty posts exhibited less student postings as well as shorter threads overall.
+A qualitative survey following their analysis revealed that the majority of instructors perceived frequent instructor intervention as a means to increase the volume of student posts, contradicting 
+the quantitative outcomes the researchers previously found. Despite this, students
+did report in surveys an appreciation for initial and follow-up questions to discussion
+threads [M & M, 2007]. 
+
+In a similar vein, [Hosler, Arend 2012] found that students wanted instructor
+participation in discussions - they felt that this interaction encouraged critical
+thinking among the group. Students also valued instructors' attempts to invite participation
+from all students. [Cranney, Wallace, Alexander, Alfano 2011] revealed a positive correlation
+between student discussion grades and instructor time spent in an online course, suggesting
+that at the very least there is some relationship between the two. However, they did not find
+a relationship between student discussion grades and the number of instructor posts. [Ertmer, Koehler 2015]
+were unable to find a direct relationship between facilitation and the quantity of student posts,
+but did note that greater instructor involvement seemed to lead to equal or greater engagement
+of the participants in the form of higher quality posts.
+
+The ambiguity of the current literature does not provide enough insight on the 
+most effective methods of instructor involvement in online discussion forums. Therefore,
+the purpose of this study was to quantitatively specify the effect of instructor
+engagement in online forums on various student outcomes. In particular, this research
+focused on the relationship between instructor activity and student perception's of faculty
+engagement, student grade outcomes, and student activity in discussion forums.
+
+
+
+2. Data Sources
+
+The dataset was assembled by first extracting post metadata from the Blackboard Learning
+Management System (LMS) and then aggregating post characteristics into a thread-level dataset.
+That is, each row in the this dataset represented an individual thread within a forum and contained
+features describing the student and instructor activity occurring in the thread. Often instructors
+use multiple forums in a single course to partition discussions by its expected content. For instance,
+one forum's purpose might be to simulate "hallway conversations", where students and instructors discuss
+general course policies and guidelines. Conversely, other forums might be directed at a particular chapter
+or subtopic within a course's curriculum. In a single course we would then expect to observe high
+variation in the type of thread activity between forums. Furthermore, in order to investigate
+the actual discussions that participants were having it was necessary to keep the data at the
+thread-level, allowing us to make sense of the frequency, type, and quality of interactions. 
+Aggregating further to the forum-level may have washed out any potential interaction effects we sought to observe,
+which is why we chose to maintain this granularity.
+
+The dataset represents _______ forum threads from _____ fully online undergraduate course-shells spanning
+the spring semester of 2016 through the summer semester of 2018. Course-shells are unique Blackboard instances for a course-section 
+or a group of course-sections taught by the same instructor in the same term. In the case that
+a shell contains multiple sections, instructors may create duplicate forums to keep students in
+different sections partitioned. Similarly, instructors teaching high-enrollment courses 
+may elect to group their students so that they can only participate within their group's forums.
+In both scenarios, there are no differences in the forums across student groupings - they 
+are simply duplicated in order to decrease the number of participants in each forum. The observations in this
+dataset are limited to exclude any irregular course types (non-standard grading schemes, shortened course-length, internships, etc.),
+threads without a designated parent post, and overly long posts. We chose to eliminate the irregular course types
+because of the high likelihood of nonstandard forum use and the "orphan" posts
+were likely a result of invalid data collection, although we were unable to verify this claim. There were very few
+posts with outlying length so we were able to confirm their validity by navigating to the actual forum. 
+In most cases, these posts were made by instructors and used to disseminate huge amounts of course information at once - 
+as if the syllabus had simply been pasted in. We determined that these posts were not of interest to this study as they
+did not represent an actual instance of discussion.
+
+
+
+
+
+
+
+
+
