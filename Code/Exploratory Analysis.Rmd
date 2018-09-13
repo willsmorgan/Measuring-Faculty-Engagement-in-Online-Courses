@@ -68,8 +68,7 @@ did not represent an actual instance of instructor or student-led discussion.
 
 ## Conversation Starters
 
-We first want to observe how often each instructors and students are 
-starting threads, so that we can understand who is initiating discussions. In the overall
+We first want to understand who is initiating discussions. In the overall
 sample, 97% of threads were made by students, indicating that students are
 the ones intiating most of the activity on discussion forums. This number should not
 necessarily raise any concerns about instrutor activity, as courses will often
@@ -78,13 +77,13 @@ might create a forum where students post responses to an essay or discussion
 prompt found elsewhere in the course. 
 
 When we filter out threads that have less than 5 total posts, this proportion
-evens out slightly - 20% percent of threads with 5 or more posts are initiated by instructors.
+evens out slightly - 10% percent of threads with 5 or more posts are initiated by instructors.
 If we make this exclusion more strict and only look at threads with 10 or more posts,
 instructor-led threads actually dominate student-led threads, albeit only by 7%. In
 any case, the pattern seems to be that longer discussions tend to be initiated 
 by instructors rather than students.
 
-```{r}
+```{r thread owner count}
 data %>%
   mutate(`Thread Owner` = if_else(thread_owner_role == "P", "Instructor", "Student")) %>%
   group_by(`Thread Owner`) %>%
@@ -94,7 +93,7 @@ data %>%
 ```
 
 
-```{r}
+```{r thread owner with filter}
 data %>%
   filter(thread_length >= 5) %>%
   mutate(`Thread Owner` = if_else(thread_owner_role == "P", "Instructor", "Student")) %>%
@@ -117,21 +116,38 @@ data %>%
 
 ## Thread Participants
 
-We have a sense of the types of users creating threads, so we now must 
-check how many people are actually participating in them. On average, less
-than 3 users are participating in any given thread. Furthermore, almost 84% of all
-threads have 3 or less users and 32% have only a single user. The single-user
-threads are almost always created by students but instructor-initiated threads
-with a single user make up nearly half of all threads created by instructors. One
-might assume then that a large fraction of instructor threads are not used for
-discussion but perhaps broadcasting information to many students at once, like
-a discussion prompt or forum guidelines. These types of threads would presumably
-have a higher amount of views then other single-participant threads, and in fact
-we do have some mild evidence in favor of this. There is a significant difference
-between student and instructor-led threads in the number of views they receive, but
-the gap only favors instructor threads by about 9 views. In smaller courses this
-could be the difference between all students seeing the thread and none of them
-seeing it but for larger courses this difference probably won't mean much.
+Thread participation is another feature describing the nature and 
+purpose of a forum. This is a relevant metric for characterizing forum use because it 
+can tell us the size and types of groups that are forming. A forum with a high
+number of average thread participants might be dedicated to broad discussion or
+designed for accessibility, whereas forums with low thread participation might
+have been intended for collecting student responses to a particular discussion
+question or assignment. 
+
+Our findings revealed that threads generally have very few users and are predominantly
+composed of students. To elaborate, faculty only posted in about 13% of all threads,
+so the number of thread participants and the number of students in a thread are almost perfectly
+aligned. Consequently, the amount of thread participants is very often going to be
+equivalent to the number of students in said thread. With that said, thread participation
+is rather low across the entire data set. More than 80% of threads have at most 3 
+participants and a third have only a single user. 
+
+```{r thread parts distr, message = FALSE}
+ecdf(data[, thread_participants])(1)
+ecdf(data[, thread_participants])(2)
+ecdf(data[, thread_participants])(3)
+
+mean(data$num_fac_posts == 0)
+```
+
+Interestingly, the instructor-initiated threads with a single user make up nearly
+half of all threads created by instructors. One might assume then that a large
+fraction of instructor threads are not used for discussion but perhaps broadcasting information
+to many students at once, like a discussion prompt or forum guidelines.
+These types of threads would presumably have a higher amount of views then other
+single-participant threads, and in fact we do have some mild evidence in favor of
+this. There is a significant difference between student and instructor-led threads 
+in the number of views they receive, but the gap only favors instructor threads by about 9 views. 
 
 ```{r parent_views mean test, echo = FALSE, message = FALSE, eval = FALSE}
 # Single participant parent_views mean test
@@ -152,44 +168,38 @@ filter(data, thread_participants <= 30) %>%
   ggplot() +
   geom_bar(aes(thread_participants, y = (..count..) / sum(..count..), fill = factor(thread_owner_role)), position = 'fill', alpha = 0.75)
 
-
-
 ```
 
-The broader idea here is that threads on average have very few users and that 
-most of the time they are only made up of students. This seems to indicate that
-ASU Online discussion forums are being used primarily for communication between 
-very small groups of students. Our data does not contain the actual written
-content of the posts, but a reasonable explanation for this pattern might be 
-that each thread is generally one student replying to a discussion prompt,
-and another student (and possibly a third) replying to that initial post.
+The average number of users does increase when a faculty member participates,
+but the impact it has on the number of students in a thread is negligible. This
+seems to indicate that ASU Online discussion forums are primarily used
+for communication between very small groups of students. Interestingly, this claim
+still holds true in longer threads. Threads between ten and forty posts long
+naturally tend to have more users, but the number of thread participants does not 
+increase drastically.
 
-Even when faculty do post in threads, the number of participants remains roughly
-the same. The proportion of posts made by faculty evens out significantly, but
-there isn't much to conclude from this specific result - when there are only two
-people in a thread and you know one of them is the instructor, it shouldn't be
-terribly surprising that about half of the posts come from faculty. 
+```{r high thread length user count}
+mean(data[num_fac_posts > 0 & thread_participants <= 35, thread_participants])
+mean(data[num_fac_posts == 0 & thread_participants <= 35, thread_participants])
 
+t1 <- (data[num_fac_posts > 0 & thread_participants <= 35, studs_in_thread])
+t2 <- (data[num_fac_posts == 0 & thread_participants <= 35, studs_in_thread])
 
-```{r, echo = FALSE, message = FALSE, eval = FALSE}
-data %>%
-  select(thread_participants, pr_posts_stu, pr_posts_fac) %>%
-  rename(`Number of Participants` = thread_participants,
-         `Proportion of posts made by Students` = pr_posts_stu,
-         `Proportion of posts made by Faculty` = pr_posts_fac) %>%
-  summary() %>%
-  kable(caption = "Student and Faculty thread participation")
+t.test(t1, t2)
 
 data %>%
-  filter(num_fac_posts >= 1) %>%
-  select(thread_participants, pr_posts_stu, pr_posts_fac) %>%
-  rename(`Number of Participants` = thread_participants,
-         `Proportion of posts made by Students` = pr_posts_stu,
-         `Proportion of posts made by Faculty` = pr_posts_fac) %>%
-  summary() %>%
-  kable(caption = "Student and Faculty thread participation")
-
+  filter(thread_length >= 10,
+         thread_length <= 40) %>%
+  ggplot(aes(thread_length, thread_participants)) + 
+  geom_jitter(alpha = 0.05) + 
+  geom_smooth()
 ```
+
+Our data unfortunately did not contain the actual written content of the posts,
+so we were unable to analyze the nature of these small groups. A reasonable
+explanation for this pattern with our given information might be that each thread
+is generally one student replying to a discussion prompt, and another student
+(and possibly a third) replying to that initial post.
 
 With that said, it is important to recognize that students need not be actively
 posting to see the content being written. It can still be beneficial for someone to
@@ -204,32 +214,30 @@ views than it does posts, we could assume that some of this viewing is being
 done by lurkers. Of course, this could also mean that the people posting are returning
 to the thread to check for responses, but the point is that having more views
 than posts allows for the possibility of lurking. In the data, we actually
-observe this phenomenon pretty frequently. About 60% of the data has twice as many
+observe this phenomenon pretty frequently. A majority of the data has twice as many
 views as it does posts, suggesting that lurking might actually be a common feature of
 ASUO forums.
 
-
-```{r}
+```{r lurkers}
 cat("Median ratio of views to number of posts: ", round(median(data$parent_views / data$thread_length, na.rm = TRUE), 2))
 ```
 
 
 ## Thread Length
 
-So far we've established that forum threads are generally student-initiated
-and have only a few participants. These findings don't necessarily imply that
-thread activity is lacking -  it could simply be that conversations among smaller
+The results thus far have established that forum threads are generally student-led
+and have only a few participants. This does not necessarily imply lackluster
+thread activity - it could simply be that conversations among smaller
 groups of students are the norm. One of the primary indicators of thread activity
 is its length, which we define as the total number of posts. Of the 1.98 million threads 
 in this data set, 59% of them have up to two posts and 78% have no more than three.
 Only 12% of threads contain 5 or more posts. Briefly put, most threads in ASUO
 forums are very short, supporting our working "post and a reply" theory.
 
-```{r, echo = FALSE, message = FALSE}
-data %>%
-  select(thread_length) %>%
-  summary() %>%
-  kable()
+```{r thread length distro, echo = FALSE, message = FALSE}
+ecdf(data[, thread_length])(1)
+ecdf(data[, thread_length])(2)
+ecdf(data[, thread_length])(3)
 
 data %>%
   mutate(`Thread Length` = if_else(thread_length < 10, as.character(thread_length), "More than 10")) %>%
@@ -239,25 +247,25 @@ data %>%
   geom_bar(stat = 'identity')
 
 data %>%
-  filter(thread_length <= 15) %>%
   ggplot(aes(thread_length)) +
-  stat_ecdf()
+  stat_ecdf() +
+  xlim(0, 20)
 
 ```
 
-
-An alternative metric we devised is the width of a thread, whose purpose is to
-quantify the depth of the conversation in the thread. In other words, this measure
+We devised an alternative metric whose purpose was to quantify the depth of the
+conversation of the thread. In other words, this measure
 was created to observe back-and-forth conversation, where one user
-will reply to a post, the original poster will reply to that, and so on. We 
-define a thread's width by the maximum number of "chain" replies in a thread. As
-an example, imagine a thread with just one post - we would define this thread to have a width of 0. When 
-someone replies to that post, the width increases to 1 and if someone responds to that
-reply the width will increase again to 2, and so on. To contrast, if there exists
-a post with 10 replies but they are all replying to the parent post, that thread
-will only have width 1, as there are no chain replies that continue the conversation.
-The maximum width of a thread is bounded above by the length of the thread minus 1,
-so our results thus far carry over to this measure. In fact, 86% of threads have
+replied to an initial post, the original poster will replied to that, and so on. As
+such, we called this metric a thread's "width", and defined it as the maximum number of chain
+replies in a thread. As an example, imagine a thread with just one post - we would
+define this thread to have a width of 0. When someone replies to that post, the
+width increases to 1 and if someone responds to that reply the width will increase
+again to 2, and so on. To contrast, if there exists a post with 10 replies but
+they are all replying to the parent post, that thread will only have width 1,
+as there are no chain replies that continue the conversation. The maximum width
+of a thread is bounded above by the length of the thread minus 1, so our results
+thus far carry over to this measure. In fact, 86% of threads have
 a width of either 0 or 1, indicating a very limited amount of back-and-forth 
 collaborative discussion taking place. Longer threads have marginally higher
 thread width but it is a very slight improvement. Threads with 5 or more posts
@@ -265,13 +273,30 @@ have an average width of 2 and threads with at least 10 posts hover around a wid
 of 3. This is an encouraging result for measuring user engagement, but these threads
 represent only 12% and 2% of the data, respectively.
 
+```{r thread_width distro}
+ecdf(data[, thread_width])(1)
+
+mean(data[thread_length >= 5, thread_width])
+mean(data[thread_length >= 10, thread_width])
+
+
+1 - ecdf(data[, thread_length])(4)
+1 - ecdf(data[, thread_length])(9)
+
+```
+
+
 Disaggregating length by thread owner reveals that instructor-led
 threads do have more posts on average, but the difference is not all that large.
 After trimming any outliers, these threads have approximately 0.75 more posts per thread.
+This effect is even less important when we take into account that the average
+number of student posts doesn't change significantly depending on the thread owner.
 Similarly, threads with at least one faculty post have about one more post on
-average than threads with no faculty posts. This marginal difference suggests that
-that instructor posts might have some impact on overall user engagement but the effect
-is likely small. 
+average than threads with no faculty posts, but have no notable impact
+on the number of student posts. These outcomes suggest that on the surface there
+does not appear to be any immediate or notable relationship between faculty and
+student posting behavior.
+
 
 ```{r, echo = FALSE, message = FALSE, eval = FALSE}
 # instr-started threads longer than student ones
@@ -280,51 +305,45 @@ tl2 <- data[thread_owner_role == "S" & thread_length <= 16, thread_length]
 
 t.test(tl1, tl2)
 
+tl3 <- data[thread_owner_role == "P" & thread_length <= 16, num_stu_posts]
+tl4 <- data[thread_owner_role == "S" & thread_length <= 16, num_stu_posts]
 
+t.test(tl3, tl4)
+```
+
+
+```{r}
 # thread length with one fac post
 tl3 <- data[num_fac_posts > 0 & thread_length <= 16, thread_length]
 tl4 <- data[num_fac_posts == 0 & thread_length <= 16, thread_length]
 
 t.test(tl3, tl4)
 
-data %>%
-  filter(thread_length <= quantile(thread_length, 0.99)) %>%
-  mutate(fac_posted = if_else(num_fac_posts > 0, "At least one post", "No faculty posts")) %>%
-  ggplot(aes(fac_posted, thread_length)) +
-  geom_boxplot()
+# thread length with one fac post
+tl5 <- data[num_fac_posts > 0 & thread_length <= 16, num_stu_posts]
+tl6 <- data[num_fac_posts == 0 & thread_length <= 16, num_stu_posts]
 
-
-### pps remain the same with more than 5 posts?
-pps1 <- data[thread_length >= 5, posts_per_student]
-pps2 <- data[thread_length < 5, posts_per_student]
-
-t.test(pps1, pps2)
-
-data %>%
-  filter(posts_per_student <= quantile(posts_per_student, 0.99)) %>%
-  mutate(thread_type = if_else(thread_length >= 5, "5 or More", "Less than 5")) %>%
-  ggplot(aes(thread_type, posts_per_student)) + 
-  geom_boxplot()
+t.test(tl5, tl6)
 ```
 
 In the few threads that do have a significant number of posts we might expect
-there to be lengthier user interactions. We are able to directly
+there to be lengthier or repeated user interactions. We are able to directly
 measure this by observing the number of posts per student and the thread width as
 defined earlier. Generally speaking both metrics measure the amount of interaction
 an individual has with a given thread, but there is an important distinction that
 should be noted. The number of posts per student specifically measures repeated
-interaction with a thread no matter what post the student is responding to. On the
+interaction with a thread no matter who or what the student is responding to. On the
 other hand, the width of a thread represents the amount of back-and-forth 
 interaction and does not take into account the type of users. 
 Threads with a high number of posts per student and low width is indicative of
 good individual presence but poor depth of interaction. To contrast, a thread with
 a low number of posts per student and high width would imply high levels of interaction
 but limited presence. Ideally, longer threads would see increases in at least one
-of these metrics. In the data, we observe an increase in both. The number of posts
+of these metrics. In the data, we observed an increase in both. The number of posts
 per student and thread width both have a positive relationship with thread length.
 However, it is not clear if the relationship is necessarily strong enough to have
 a significant impact on the quality and quantity of user interaction. The mean number
-of posts per student does not exceed 3 posts until threads are 20 posts long, which
+of posts per student does not exceed 3 until threads are 20 posts long, which
 seldom happens. Thread width increases faster with more posts - by the time
 a thread reaches 10 posts it will have a width of 3 on average, indicating a moderate
 amount of conversation between users in larger threads. This is a promising result
@@ -334,7 +353,7 @@ the third post.
 
 ```{r, echo = FALSE, message = FALSE, eval = FALSE}
 data %>%
-  filter(thread_length <= 30) %>%
+  filter(thread_length <= 30 & !is.na(posts_per_student)) %>%
   group_by(thread_length) %>%
   summarise(posts_per_student = mean(posts_per_student)) %>%
   ggplot(aes(thread_length, posts_per_student)) +
@@ -350,7 +369,6 @@ data %>%
 ```
 
 
-
 ## Characterizing responses
 
 Social presence is an important determinant of student success. This is especially
@@ -360,57 +378,94 @@ is meant to be one venue for this type of interaction, so it is important to und
 the quantity and types of interactions taking place in order to evaluate its efficacy.
 In this setting there are two types of users (students and instructors), providing
 four possible combinations of user-to-user interaction. We first analyze student
-response behavior before transitioning to faculty response behavior. Before
-continuing however, it should be noted that 30% of all threads created in
-this data set do not have any sort of response and are thus excluded from this 
-section. 
+response behavior and then transition to faculty response behavior.
 
-Threads rarely have more than a couple student responses - 80% have two or less.
+To begin, threads rarely had more than a couple student responses - 80% had less than three.
 There was a statistically significant increase in the number of student responses
-when the thread was created by a faculty member, so it does appear that students
-are more responsive to faculty. A t-test revealed that this difference is only
-very slight, around 0.8 more posts when made by faculty.
+when the thread was created by a faculty member, so it might appear that students
+are more responsive to faculty. After controlling for outliers this amounts to 
+an increase in about 1 student response when the thread is created by faculty. In
+addition, we observed a 48% increase in the average student response length
+when the thread was created by a faculty member, indicating that not only are students
+responding more frequently but in greater detail, too. It is important to note
+that this data did not evaluate the actual content of the student responses,
+so this relationship does not necessarily imply that faculty activity precipitates
+higher-quality student posts. This statistic also conceals the fact that instructor-led
+threads account for less than 3% of the data. In any case, this is a notable result
+because it implies there is at least some meaningful difference in the way
+students respond to faculty as opposed to other students.
 
 ```{r}
-stu <- data[student_responses > 0]
+ecdf(data[, student_responses])(2)
 
-stu %>%
-  filter(thread_length <= 30) %>%
-  ggplot(aes(student_responses, color = factor(thread_owner_role))) + 
-  stat_ecdf()
-
-r1 <- stu[thread_owner_role == "P" & thread_length <= 16, student_responses]
-r2 <- stu[thread_owner_role == "S" & thread_length <= 16, student_responses]
+r1 <- data[thread_owner_role == "P" & thread_length <= 20, student_responses]
+r2 <- data[thread_owner_role == "S" & thread_length <= 20, student_responses]
 
 t.test(r1, r2)
 
+data %>%
+  mutate(`Student Responses` = if_else(student_responses < 10, as.character(student_responses), "More than 10")) %>%
+  group_by(`Student Responses`) %>%
+  summarise(prop = (n() / nrow(data))) %>%
+  ggplot(aes(`Student Responses`, prop)) +
+  geom_bar(stat = 'identity')
+
+
+r3 <- data[thread_owner_role == "P" & avg_stu_response_len <= 3753, avg_stu_response_len]
+r4 <- data[thread_owner_role == "S" & avg_stu_response_len <= 3753, avg_stu_response_len]
+
+t.test(r3, r4)
+
 ```
 
+Faculty exhibit a similar pattern of responsiveness - 99% of threads have two or
+less faculty responses. This alone is not problematic because expecting high 
+faculty responsiveness in every thread is unreasonably burdensome. However, this
+pattern persists (albeit to a lesser degree) even when we limit threads to have 
+at least some faculty involvement. 65% of all threads in this subset still have 
+only a single faculty response. So, even when there is some form of engagement 
+faculty responsiveness is still quite limited. This conclusion is substantiated 
+by the fact that most of the time, faculty are only responding to a very slim
+proportion of the students involved in a thread. To elaborate, faculty are on 
+average responding to only 8% of the individual students in threads with both
+faculty and student participation. 
 
 
-Faculty exhibit the same pattern of responsiveness to a much greater degree - 
-99% of threads have two or less faculty responses. This alone is not problematic
-because expecting high faculty responsiveness in every thread is unreasonably burdensome.
-However, this pattern persists even when we limit threads to have at least some faculty
-involvement. 70% of all threads in this subset still have only a single faculty response.
-So, even when there is some form of faculty engagement faculty responsiveness
-is still quite limited.
+```{r, message = FALSE}
+ecdf(data[num_fac_posts > 0, faculty_responses])(0)
+ecdf(data[num_fac_posts > 0, faculty_responses])(1)
 
-
-prop stu responded to graph!!!
-
-
-```{r}
 data %>%
-  filter(!is.na(prop_stu_responded_to),
-         studs_in_thread > 0,
+  filter(studs_in_thread > 0,
          studs_in_thread <= 30,
-         num_fac_posts > 0) %>%
+         faculty_responses > 0) %>%
   ggplot(aes(prop_stu_responded_to)) +
-  geom_histogram()
+  geom_histogram(bins = 10)
   
+mean(data[between(studs_in_thread, 1, 30) & faculty_responses > 0, prop_stu_responded_to])
+mean(data[between(studs_in_thread, 1, 2) & faculty_responses > 0, prop_stu_responded_to])
+mean(data[between(studs_in_thread, 10, 20) & faculty_responses > 0, prop_stu_responded_to])
+
+data %>%
+  filter(studs_in_thread > 0,
+         studs_in_thread <= 50,
+         faculty_responses > 0) %>%
+  group_by(studs_in_thread) %>%
+  summarise(prop_stu_responded_to = mean(prop_stu_responded_to)) %>%
+  ggplot(aes(studs_in_thread, prop_stu_responded_to)) + 
+  geom_point() +
+  geom_smooth(se = FALSE)
 
 
+mlem <- data %>% 
+  filter(!is.na(prop_stu_responded_to),
+         studs_in_thread <= 50) %>%
+  group_by(studs_in_thread) %>%
+  summarise(prop = mean(prop_stu_responded_to),
+            count = n())
+
+
+mlem2 <- filter(data, prop_stu_responded_to > 0.5)
 ```
 
 
@@ -432,6 +487,53 @@ posts per student)
     - instructor announcements
     - Q/A sesh
     - etc. 
+
+
+- how many threads have one student post and one student reply?
+- In really long threads are student replies any longer than short threads?
+  how does avg_stu_response_len change with the amount of participants
+    (small group v. large group)
+  does avg_stu_response_len change at all when there is at least one faculty post?
+    think - if a student knows a faculty is participating do they make longer posts
+- is there a correlation b/w num of student responses and num of faculty posts
+
+```{r}
+cor(data[thread_length > 1, .(num_stu_posts, num_fac_posts)])
+
+data %>%
+  filter(thread_length > 1 & thread_length <= 30) %>%
+  ggplot(aes(num_stu_posts, faculty_responses)) + 
+  geom_jitter(alpha = 0.025, width = 0.5, height = 0.5)
+
+```
+
+```{r, echo = FALSE, message = FALSE, eval = FALSE}
+## Number of participating students in thread
+data %>%
+  filter(studs_in_thread <= 30) %>%
+  mutate(studs_in_thread = if_else(studs_in_thread >= 10, "At least 10", as.character(studs_in_thread))) %>%
+  ggplot(aes(studs_in_thread)) + 
+  geom_histogram(stat = 'count')
+
+```
+
+```{r}
+data %>%
+  filter(thread_length <= quantile(thread_length, 0.99)) %>%
+  mutate(fac_posted = if_else(num_fac_posts > 0, "At least one post", "No faculty posts")) %>%
+  ggplot(aes(fac_posted, thread_length)) +
+  geom_boxplot()
+
+```
+
+```{r}
+data %>%
+  filter(thread_length <= 30) %>%
+  ggplot(aes(student_responses, color = factor(thread_owner_role))) + 
+  stat_ecdf()
+
+```
+
 
 ```{r, eval = FALSE}
 log <- file("thread_log.txt", open = 'wt')
