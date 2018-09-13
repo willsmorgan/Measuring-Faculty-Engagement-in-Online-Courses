@@ -113,7 +113,7 @@ threadFeatures <- function(post_data) {
   
   
   ## Proportion of students in thread who get a reply from faculty
-  temp <- post_data[, faculty_responded := if_else(user_role == "P" & parent_role == "S", 1, 0)] %>%
+  temp <- post_data[, faculty_responded := if_else(user_role == "S" & faculty_responses >= 1, 1, 0)] %>%
     .[is.na(faculty_responded), faculty_responded := 0] %>%
     .[, .(forum_id, thread_id, post_id, parent_id, user_role, parent_role, faculty_responded, emplid, studs_in_thread)] %>%
     .[, .SD[1], .(forum_id, thread_id, emplid)] %>%
