@@ -90,7 +90,7 @@ threadFeatures <- function(post_data) {
     .[, parent_views := max(parent_views), by = .(forum_id, thread_id)]
   
   # Posts per active student
-  post_data[, posts_per_student := num_stu_posts / thread_participants, by = .(forum_id, thread_id)]
+  post_data[, posts_per_student := num_stu_posts / studs_in_thread, by = .(forum_id, thread_id)]
   
   # Lifecycle of a thread (must check validity later)
   post_data[thread_length > 1, thread_lifetime := difftime(max(post_timestamp), min(post_timestamp), units = c("days")), by = .(forum_id, thread_id)]
@@ -113,34 +113,19 @@ threadFeatures <- function(post_data) {
   
   
   ## Proportion of students in thread who get a reply from faculty
-  prop_responses <- post_data[parent_post == 0, .(forum_id, thread_id, post_id, parent_id, user_role, parent_role, emplid, studs_in_thread)]
+  temp <- post_data[, faculty_responded := if_else(user_role == "S" & parent_role == "P", 1, 0)] %>%
+    .[is.na(faculty_responded), faculty_responded := 0] %>%
+    .[, .(forum_id, thread_id, post_id, parent_id, user_role, parent_role, faculty_responded, emplid, studs_in_thread)] %>%
+    .[, .SD[1], .(forum_id, thread_id, emplid)] %>%
+    .[, students_responded_to := sum(faculty_responded), .(forum_id, thread_id)] %>%
+    .[, prop_stu_responded_to := students_responded_to / studs_in_thread] %>%
+    .[, .SD[1], .(forum_id, thread_id)] %>%
+    .[, .(forum_id, thread_id, prop_stu_responded_to)]
   
-  temp <- post_data[parent_post == 0, .(forum_id, thread_id, post_id, parent_id, user_role, parent_role, emplid)] %>%
-    .[, fac_responded := if_else(user_role == "P" & parent_role == "S", 1, 0)] %>%
-    .[fac_responded == 1, .(forum_id, thread_id, parent_id, fac_responded)] %>%
-    .[.[, .I[1], by = .(forum_id, thread_id, parent_id)]$V1] %>%
-    .[, `:=`(post_id = parent_id,
-             parent_id = NULL)]
+
+  post_data <- temp[post_data, on = c("forum_id", "thread_id")]  
   
-  prop_responses <- temp[prop_responses, on = c("post_id", "forum_id", "thread_id")] %>%
-    .[is.na(fac_responded), fac_responded := 0L] %>%
-    .[, fac_responded := max(fac_responded), by = .(forum_id, thread_id, emplid)] %>%              # did they respond to a given student?
-    .[.[, .I[1], by = .(forum_id, thread_id, emplid)]$V1] %>%                                    # select one obs from each thread and empl
-    .[user_role == "S", fac_responded := sum(fac_responded), by = .(forum_id, thread_id)] %>%      # how many students did they respond to 
-    .[.[, .I[1], by = .(forum_id, thread_id)]$V1] %>%                                            # select one obs from each thread
-    .[, .(forum_id, thread_id, fac_responded, studs_in_thread)] %>%
-    .[, `:=`(prop_stu_responded_to = fac_responded / studs_in_thread,
-             studs_in_thread = NULL,
-             fac_responded = NULL)] %>%
-    .[!is.na(forum_id)]
-  
-  post_data <- prop_responses[post_data, on = c("forum_id", "thread_id")] %>%
-    .[is.na(prop_stu_responded_to) & num_stu_posts == 0, prop_stu_responded_to := NA_real_] %>%
-    .[is.na(prop_stu_responded_to) & num_stu_posts > 0, prop_stu_responded_to := 0] %>%
-    .[thread_length == 1, prop_stu_responded_to := NA_real_]
-  
-  rm(prop_responses, temp)
-  
+  rm(temp)
   
   # subset and reduce to thread-level
   cols <- c("forum_id", "thread_id", "thread_participants", "prop_stu_responded_to",
