@@ -382,9 +382,9 @@ response behavior and then transition to faculty response behavior.
 
 To begin, threads rarely had more than a couple student responses - 80% had less than three.
 There was a statistically significant increase in the number of student responses
-when the thread was created by a faculty member, so it might appear that students
-are more responsive to faculty. After controlling for outliers this amounts to 
-an increase in about 1 student response when the thread is created by faculty. In
+when the thread was created by a faculty member, so it appears that students perhaps
+are more responsive to faculty than their peers. After controlling for outliers,
+this amounts to an increase in about 1 student response when the thread is created by faculty. In
 addition, we observed a 48% increase in the average student response length
 when the thread was created by a faculty member, indicating that not only are students
 responding more frequently but in greater detail, too. It is important to note
@@ -418,22 +418,28 @@ t.test(r3, r4)
 
 ```
 
-Faculty exhibit a similar pattern of responsiveness - 99% of threads have two or
-less faculty responses. This alone is not problematic because expecting high 
-faculty responsiveness in every thread is unreasonably burdensome. However, this
-pattern persists (albeit to a lesser degree) even when we limit threads to have 
-at least some faculty involvement. 65% of all threads in this subset still have 
+Faculty exhibit a similar pattern of responsiveness - 90% of threads have no
+faculty responses. This alone is not problematic because expecting high 
+faculty responsiveness in every thread is unreasonably burdensome. This
+pattern persists however (albeit to a lesser degree) in threads with at least one
+faculty post. 65% of all threads in this subset still have 
 only a single faculty response. So, even when there is some form of engagement 
-faculty responsiveness is still quite limited. This conclusion is substantiated 
-by the fact that most of the time, faculty are only responding to a very slim
-proportion of the students involved in a thread. To elaborate, faculty are on 
-average responding to only 8% of the individual students in threads with both
-faculty and student participation. 
-
+faculty participation is still quite limited. 
 
 ```{r, message = FALSE}
-ecdf(data[num_fac_posts > 0, faculty_responses])(0)
+ecdf(data[, faculty_responses])(0)
+ecdf(data[, faculty_responses])(2)
+
 ecdf(data[num_fac_posts > 0, faculty_responses])(1)
+ecdf(data[num_fac_posts > 0, faculty_responses])(2)
+```
+
+Despite the infrequent nature of faculty responding behavior, students in threads
+with at least one faculty response had a relatively high chance of interacting with
+faculty.
+
+
+```{r}
 
 data %>%
   filter(studs_in_thread > 0,
@@ -441,31 +447,31 @@ data %>%
          faculty_responses > 0) %>%
   ggplot(aes(prop_stu_responded_to)) +
   geom_histogram(bins = 10)
-  
+
 mean(data[between(studs_in_thread, 1, 30) & faculty_responses > 0, prop_stu_responded_to])
-mean(data[between(studs_in_thread, 1, 2) & faculty_responses > 0, prop_stu_responded_to])
-mean(data[between(studs_in_thread, 10, 20) & faculty_responses > 0, prop_stu_responded_to])
+mean(data[between(studs_in_thread, 1, 5) & faculty_responses > 0, prop_stu_responded_to])
+mean(data[between(studs_in_thread, 5, 30) & faculty_responses > 0, prop_stu_responded_to])
 
 data %>%
   filter(studs_in_thread > 0,
-         studs_in_thread <= 50,
-         faculty_responses > 0) %>%
+         studs_in_thread <= 50) %>%
   group_by(studs_in_thread) %>%
   summarise(prop_stu_responded_to = mean(prop_stu_responded_to)) %>%
   ggplot(aes(studs_in_thread, prop_stu_responded_to)) + 
   geom_point() +
   geom_smooth(se = FALSE)
 
-
-mlem <- data %>% 
-  filter(!is.na(prop_stu_responded_to),
+data %>%
+  mutate(fac_resp = if_else(faculty_responses > 0, "Y", "N")) %>%
+  filter(studs_in_thread > 0,
          studs_in_thread <= 50) %>%
-  group_by(studs_in_thread) %>%
-  summarise(prop = mean(prop_stu_responded_to),
-            count = n())
+  group_by(studs_in_thread, fac_resp) %>%
+  summarise(prop_stu_responded_to = mean(prop_stu_responded_to)) %>%
+  ggplot(aes(studs_in_thread, prop_stu_responded_to, color = factor(fac_resp))) + 
+  geom_point() +
+  geom_smooth(se = FALSE)
 
 
-mlem2 <- filter(data, prop_stu_responded_to > 0.5)
 ```
 
 
