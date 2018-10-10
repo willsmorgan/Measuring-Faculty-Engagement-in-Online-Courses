@@ -83,8 +83,23 @@ data <- postFeatures(data)
 fwrite(data, "Data/posts_cleaned.csv")
 #------------------------------------------------------------------------------#
 ## 4. Aggregate to thread level
+users <- data %>%
+  group_by(bb_course_id, user_role) %>%
+  summarise(num_users = length(unique(emplid))) %>%
+  ungroup() %>%
+  mutate(num_faculty = if_else(user_role == "P", num_users, 0L),
+         num_students = if_else(user_role == "S", num_users, 0L)) %>%
+  group_by(bb_course_id) %>%
+  mutate(num_faculty = sum(num_faculty),
+         num_students = sum(num_students)) %>%
+  select(bb_course_id, num_faculty, num_students) %>%
+  mutate(num_faculty = if_else(num_faculty == 0, 1L, num_faculty)) %>%
+  group_by(bb_course_id) %>%
+  slice(1)
 
 data <- threadFeatures(data)
+
+data <- inner_join(data, users, on = "bb_course_id")
 
 # export thread-level dataset
 fwrite(data, "Data/thread_cleaned.csv")
