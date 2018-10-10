@@ -1,0 +1,401 @@
+---
+title: "Modeling Workspace"
+author: "Will Morgan"
+date: "October 3, 2018"
+output: pdf_document
+---
+
+- pick a goddamn sample already
+- estimate poisson models
+- check for possible over- or under-dispersion
+- estimate QP models
+- compare aic of nb and pois models (to find which formula specification is best, and to show if nb > pois)
+- compare estimates and std errors of qp, nb models
+- show model fit statistics (std res, influence plot, error function)
+MAYBE <!-- - run zip/zinb -->
+MAYBE <!-- - compare fit of zip/zinb with AIC/err func (show model fit stats) -->
+MAYBE <!-- - compare estimates and std errors of nb, zip/zinb model -->                    
+- calc/interpret av mfx
+
+
+### 0. Setup
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+## 0. Setup and Import
+libs <- c("data.table", "dplyr", "magrittr", "ggplot2", "forcats", "purrr", "AER",
+          "pscl", "broom", "here", "margins")
+lapply(libs, library, character.only = TRUE)
+source(here("Code/utils/model_utils.R"))
+
+data <- fread(here("Data/thread_cleaned.csv")) %>%
+  mutate(faculty_owner = if_else(thread_owner_role == "P", "Y", "N"),
+         faculty_responded = if_else(faculty_responses > 0, "Y", "N")) %>%
+  as.data.table() 
+```
+
+### 1. Sample Selection
+```{r sample}
+## 1. Sample selection (filters)
+
+# 99% quantile filter
+data %<>%
+  filter(thread_participants <= 9,
+         thread_length <= 16,
+         student_responses <= 15,
+         studs_in_thread <= 9,
+         parent_views <= 54,
+         !is.na(parent_views),
+         !is.na(thread_width)) %>%
+  filter(strm %in% c(2167, 2171, 2177, 2181)) %>%
+  as.data.table()
+
+# # 99.5% quantile filter
+# data %<>%
+#   filter(thread_participants <= 15,
+#          thread_length <= 32,
+#          student_responses <= 30,
+#          studs_in_thread <= 15,
+#          !is.na(parent_views),
+#          !is.na(thread_width),
+#          parent_views <= 125) %>%
+#   filter(strm %in% c(2167, 2171, 2177, 2181)) %>%
+#   as.data.table()
+
+
+#### Potential subsets
+
+## Course sections with >500 threads
+# sections <- data %>%
+#   group_by(bb_course_id) %>%
+#   summarise(posts = sum(thread_length),
+#             threads = n()) %>%
+#   filter(threads >= 500) %>%
+#   select(bb_course_id) %>%
+#   unlist()
+# 
+# nsr <- data[bb_course_id %in% sections, .(student_responses, faculty_responded, faculty_owner,
+#                 parent_views, parent_post_length)][
+#                   , parent_post_length := log(1 + parent_post_length)]
+
+
+## Subjects known to have high forum use
+# subjects <- c("ENG", "PSY", "COM", "BIS", "OGL")
+# subjects <- c("ENG")
+# nsr <- data[subject %in% subjects, .(student_responses, faculty_responded, faculty_owner,
+#                 parent_views, parent_post_length)][
+#                   , parent_post_length := log(1 + parent_post_length)]
+
+###NOTES:
+# ENG, PSY, COM, BIS, OGL are top 5 (in order) most occurring subjects
+
+## Courses known to have high forum use
+courses <- data %>%
+  group_by(course) %>%
+  summarise(posts = sum(thread_length),
+            threads = n()) %>%
+  ungroup() %>%
+  arrange(desc(posts))
+
+head(courses, 10)
+
+courses %<>%
+  slice(1:5) %>%
+  select(course) %>%
+  unlist()
+
+nsr <- data[course %in% courses, .(student_responses, faculty_responded, faculty_owner,
+                                  parent_views, parent_post_length)][
+                                    , parent_post_length := log(1 + parent_post_length)]
+
+# nsr <- data[course == "ENG102", .(student_responses, faculty_responded, faculty_owner,
+#                                   parent_views, parent_post_length)][
+#                                     , parent_post_length := log(1 + parent_post_length)]
+
+```
+
+### 2. Model Setup
+```{r formulas}
+# setup
+formulas <- list(
+  as.formula(student_responses ~ faculty_responded),
+  as.formula(student_responses ~ faculty_owner),
+  as.formula(student_responses ~ .),
+  as.formula(student_responses ~ . + faculty_owner*faculty_responded +
+               faculty_owner*parent_views + faculty_owner*parent_post_length),
+  as.formula(student_responses ~ (.)^2)
+)
+
+formula_names <- c("Null", "Faculty Responses Only", "Faculty Owner Only",
+                   "All Predictors", "Predictors and Interactions", "Saturated")
+
+#nsr %<>% sample_frac(0.1)
+
+```
+
+
+### 3. Poisson Models and testing for equidispersion
+```{r poisson, echo = TRUE}
+pois <- runCountMods(formulas, nsr, "poisson")
+names(pois) <- formula_names
+
+# Dispersion (ratio of deviance to residual.df, deviance approaches chi2 with mean = df)
+map(pois, function(x) x$deviance / x$df.residual)
+map(pois, dispersiontest, alternative = 'two.sided')
+```
+
+
+### 4. QP Models
+```{r qp, echo = TRUE}
+## QP
+qp <- runCountMods(formulas, nsr, 'quasipoisson')
+names(qp) <- formula_names
+
+summary(qp[[3]])
+summary(qp[[4]])
+
+```
+
+
+qp dispersion estimates are strangely above and below 1 - inconsistent measure
+of dispersion, but we can see that the models with more vars are consistenly
+underdispersed. Since we can assume that these models are better fitting (AIC, LR test)
+then the dispersion estimate is probably better. Move forward assuming that 
+we have underdispersed data (which rules out use of NB for now)
+
+
+### 5a. NB models (run if overdispersed)
+```{r nb, echo = TRUE}
+nb <- runCountMods(formulas, nsr, family = 'nb')
+names(nb) <- formula_names
+
+summary(nb[[3]])
+summary(nb[[4]])
+
+# nb_test1 <- MASS::glm.nb(formulas[[1]], nsr,
+#                             control = glm.control(maxit = 250, trace = 3))
+# 
+# nb_test2 <- MASS::glm.nb(formulas[[3]], nsr,
+#                             control = glm.control(maxit = 250, trace = 3))
+
+```
+
+
+if we're using zip we need to come up with some sort of reason as to why there might
+be a structural component of the distribution creating zeros:
+
+question:
+
+is there an underlying process that is generating a higher-than-expected amount
+of threads with no student responses?
+
+possible answer:
+
+participants are creating threads not intended for actual discussion. Instructors
+might do this to disseminate a bunch of info at once (syllabus, project descr., etc.)
+or another scenario might be that they create a "stickied" thread describing 
+what the students need to post in that forum. Might be happening with students
+as well if instructors are using forums to just collect responses to a discussion 
+prompt
+
+next step:
+
+if we're going to assume that the above answer is the reason for why we are seeing
+so many zeros, how can we identify this? what would be a good predictor for this happening?
+
+- faculty responded (if student posts a question answered by a faculty, no need for student to reply)
+- faculty owner (for reasons described above)
+- parent views (threads like the one described above would likely be meant for a wide audience, hence more views)
+- parent post length (meh)
+- faculty_owner*parent_views (if made by student and has low views, probably less chance of being responded to)
+
+
+### 5b. ZIP Models (run if underdispersed - structural zeros)
+```{r zip, echo = TRUE}
+library(pscl)
+
+zip_test1 <- zeroinfl(formulas[[1]], nsr, dist = 'poisson', link = 'logit')
+summary(zip_test)
+
+zip_test2 <- zeroinfl(formulas[[3]], nsr, dist = 'poisson', link = 'logit')
+summary(zip_test2)
+
+# full desired model
+formula <- as.formula("student_responses ~ faculty_responded + faculty_owner +
+                      parent_views + parent_post_length + faculty_owner*faculty_responded +
+                      faculty_owner*parent_views + faculty_owner*parent_post_length | faculty_responded + faculty_owner + parent_views + parent_post_length + faculty_owner*parent_post_length  + faculty_owner*parent_views")
+
+zip_test2 <- zeroinfl(formula, nsr, dist = 'poisson', link = 'logit')
+summary(zip_test2)
+
+```
+
+
+
+### 6. Model Comparisons
+
+#### AIC Check
+```{r}
+## Pois and NB AICs
+aic <- bind_rows(
+  data.frame(aic = map_dbl(nb, AIC), model = "nb", formula = names(nb), stringsAsFactors = FALSE),
+  data.frame(aic = map_dbl(pois, AIC), model = "pois", formula = names(pois), stringsAsFactors = FALSE)
+)
+
+ggplot(aic, aes(factor(formula, levels = rev(formula_names)), aic - min(aic), fill = model)) +
+  geom_bar(position = 'dodge', stat = 'identity') +
+  coord_flip() +
+  theme(axis.title.y = element_blank())
+
+# lrtest of NB saturated and NB predictors and interactions ====> use saturated NB as final model
+lrtest(nb[[6]], nb[[5]])
+
+```
+
+#### Estimate Comparisons
+
+```{r no interactions}
+# all vars, no interactions
+knitr::kable(tidy(qp[[4]]))
+knitr::kable(tidy(nb[[4]]))
+
+# # all vars, some interactions
+# knitr::kable(tidy(qp[[5]]))
+# knitr::kable(tidy(nb[[5]]))
+# 
+# # saturated
+# knitr::kable(tidy(qp[[6]]))
+# knitr::kable(tidy(nb[[6]]))
+
+## all var no interaction estimate plot
+qp_4 <- tidy(qp[[4]]) %>%
+  mutate(method = "QP")
+
+nb_4 <- tidy(nb[[4]]) %>%
+  mutate(method = "NB")
+
+bind_rows(qp_4, nb_4) %>%
+  ggplot(aes(term, estimate, fill = factor(method))) +
+  geom_bar(position = 'dodge', stat = 'identity') +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5)) +
+  coord_flip()
+
+```
+
+```{r some interactions} 
+## all var no interaction estimate plot
+qp_5 <- tidy(qp[[5]]) %>%
+  mutate(method = "QP")
+
+nb_5 <- tidy(nb[[5]]) %>%
+  mutate(method = "NB")
+
+bind_rows(qp_5, nb_5) %>%
+  ggplot(aes(term, estimate, fill = factor(method))) +
+  geom_bar(position = 'dodge', stat = 'identity') +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5)) +
+  coord_flip()
+
+```
+
+
+#### 7. Model diagnostics
+
+```{r influence plots, eval = F}
+# Extract OG model
+nsr0 <- nsr
+model0 <- nb[[4]]
+influencePlot(model0)
+
+sr0 <- MASS::studres(model0)
+sum(abs(sr0) > 2)                  # number of obs with high studentized residuals
+filter <- abs(sr0) <= 2
+
+# Create new data and run again
+nsr1 <- nsr[filter, ]
+model1 <- MASS::glm.nb(formulas[[3]], data = nsr1)
+influencePlot(model1)
+
+sr1 <- MASS::studres(model1)
+sum(abs(sr1) > 2)                  # number of obs with high studentized residuals
+filter <- abs(sr1) <= 2
+
+# Another one
+nsr2 <- nsr1[filter, ]
+model2 <- MASS::glm.nb(formulas[[3]], data = nsr2)
+influencePlot(model2)
+```
+
+
+### 8. Average Marginal Effects
+```{r calculate MEs}
+
+## Cannot be data.table for margins to work
+nsr %<>% as.data.frame()
+
+model <- MASS::glm.nb(formulas[[5]], data = nsr)
+
+# pure margins
+mfx <- margins(model, type = 'response')
+summary(mfx)
+
+# at different number of views
+mfx_views <- summary(margins(model, type = 'response', at = list(parent_views = seq(0, 50, 10))))
+
+# at different lengths
+mfx_lengths <- summary(margins(model, type = 'response', at = list(parent_post_length = seq(0, 10, 1))))
+```
+
+```{r plot main effects}
+main_ame <- summary(mfx)
+
+ggplot(main_ame, aes(factor, AME)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.3) +
+  ylim(c(-1, 1)) +
+  geom_hline(yintercept = 0, linetype = 'dashed') +
+  labs(title = "Average Effect of a 1-unit increase",
+       y = "Change in # of Student Responses",
+       x = "Variable") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+```{r plot fx at levels}
+ggplot(mfx_views, aes(parent_views, AME, color = factor(factor))) + 
+  geom_point() +
+  geom_line() +
+  geom_errorbar(aes(ymin = lower, ymax = upper, width = 0.25)) +
+  labs(title = "Effect of a 1-unit increase in Theoretical Posts with X Views",
+       x = "Number of Views",
+       y = "Change in number of student responses") +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.title = element_blank())
+
+ggplot(mfx_lengths, aes(parent_post_length, AME, color = factor(factor))) + 
+  geom_point() +
+  geom_line() +
+  geom_errorbar(aes(ymin = lower, ymax = upper, width = 0.25)) +
+  labs(title = "Effect of a 1-unit increase in Theoretical Posts with X Views",
+       x = "ln(Post Length)",
+       y = "Change in number of student responses") +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.title = element_blank())
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
